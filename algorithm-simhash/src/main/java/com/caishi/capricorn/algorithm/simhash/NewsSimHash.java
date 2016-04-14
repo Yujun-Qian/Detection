@@ -223,7 +223,7 @@ public class NewsSimHash {
                 }
                 */
 
-                if ((!("".equals(word))) && (!this.stopWords.contains(word) && !this.words.contains(word))) {
+                if ((!("".equals(word))) && (!this.stopWords.contains(word) /*&& !this.words.contains(word)*/)) {
                     this.words.add(word);
                     this.wordsNature.add(new WordNature(word, nature));
                     if (this.wordsMap.containsKey(word)) {
