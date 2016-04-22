@@ -239,7 +239,7 @@ public class SimHashTest {
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "10957593bff98b75";
+          String newsId1 = "835633436b3cc74d";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -260,7 +260,7 @@ public class SimHashTest {
 
         //String newsId2 = "2bb4947f764";
         //String newsId2 = "20000251676dc556";
-        String newsId2 = "3097f5137ff98b75";
+        String newsId2 = "82763343231cc745";
         //String newsId2 = "2000079abe3fd6b7";
         iterable = newsContent.find(new Document("_id", newsId2));
         cursor = iterable.iterator();
@@ -300,6 +300,7 @@ public class SimHashTest {
         }
     }
 
+    /*
     @Test
     public void testSimhash1() {
         final Set<String> stopWords = initStopWordsSet();
@@ -395,6 +396,7 @@ public class SimHashTest {
             }
         }
     }
+    */
 
     @Test
     public void testTag() {
@@ -433,10 +435,41 @@ public class SimHashTest {
         final MongoDatabase db1 = mongoClient1.getDatabase("news");
         MongoCollection newsContent = db1.getCollection("newsContent");
 
-        String newsId1 = "85d04099f213020b";
+        String newsId1 = "6ecad2032e506705";
         //String newsId1 = "e6dbe2822a4c5432";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
+        while (cursor.hasNext()) {
+            Document document = (Document)cursor.next();
+
+            //System.out.println(document);
+            //System.out.println(document.toJson());
+
+            String newsStr = document.toJson();
+            //System.out.println("**************** newsStr is: " + newsStr);
+            JSONObject newsObj = (JSONObject)JSON.parse(newsStr);
+            String title = (String)newsObj.get("title");
+            String original_content = (String)newsObj.get("content");
+            String content = NewsSimHash.processContent(title + original_content);
+
+            final NewsSimHash ns = new NewsSimHash(stopWords, content, false);
+            Map<String, Integer> wordsMap = ns.getWordsMap();
+            List<Term> parse = ns.getParse();
+
+            KeyWordComputer kwc = new KeyWordComputer(20);
+            Collection<Keyword> result = kwc.computeArticleTfidf(parse, content.length(), title.length());
+            {
+                System.out.println(title);
+                System.out.println(content);
+                System.out.println(result);
+            }
+        }
+        cursor.close();
+
+        newsId1 = "";
+        //String newsId1 = "e6dbe2822a4c5432";
+        iterable = newsContent.find(new Document("_id", newsId1));
+        cursor = iterable.iterator();
         while (cursor.hasNext()) {
             Document document = (Document)cursor.next();
 
