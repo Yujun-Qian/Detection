@@ -68,9 +68,19 @@ import org.ansj.splitWord.analysis.NlpAnalysis;
 import org.ansj.splitWord.analysis.ToAnalysis;
 import org.ansj.util.*;
 import org.ansj.recognition.*;
-//import org.ansj.app.keyword.*;
-//import org.ansj.app.keyword.KeyWordComputer;
-//import org.ansj.app.keyword.Keyword;
+import static org.ansj.util.MyStaticValue.userLibrary;
+import static org.ansj.util.MyStaticValue.LIBRARYLOG;
+import static org.ansj.library.UserDefineLibrary.FOREST;
+import static org.ansj.library.UserDefineLibrary.ambiguityForest;
+import static org.ansj.library.UserDefineLibrary.loadLibrary;
+
+import org.ansj.util.MyStaticValue;
+import org.nlpcn.commons.lang.tire.domain.Forest;
+import org.nlpcn.commons.lang.tire.domain.Value;
+import org.nlpcn.commons.lang.tire.domain.WoodInterface;
+import org.nlpcn.commons.lang.tire.library.Library;
+import org.nlpcn.commons.lang.util.IOUtil;
+import org.nlpcn.commons.lang.util.StringUtil;
 
 import com.mongodb.*;
 import com.mongodb.client.MongoDatabase;
@@ -479,6 +489,12 @@ public class NewsSimHash {
         String DEBUG = "false";
 
         try {
+            System.out.println(org.ansj.util.MyStaticValue.userLibrary);
+            org.ansj.util.MyStaticValue.userLibrary = "/home/hadoop/software/default.dic";
+            org.ansj.util.MyStaticValue.ambiguityLibrary = "/home/hadoop/software/ambiguity.dic";
+            initUserLibrary();
+            initAmbiguityLibrary();
+
             InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
             if (is != null) {
                 Properties prop = new Properties();
@@ -2236,5 +2252,48 @@ public class NewsSimHash {
         processedContent = filterSpecialOrigin2(processedContent);
 
         return processedContent;
+    }
+
+    /**
+     * 加载纠正词典
+     */
+    private static void initAmbiguityLibrary() {
+        // TODO Auto-generated method stub
+        String ambiguityLibrary = MyStaticValue.ambiguityLibrary;
+        if (StringUtil.isBlank(ambiguityLibrary)) {
+            LIBRARYLOG.warning("init ambiguity  warning :" + ambiguityLibrary + " because : file not found or failed to read !");
+            return;
+        }
+        ambiguityLibrary = MyStaticValue.ambiguityLibrary;
+        File file = new File(ambiguityLibrary);
+        if (file.isFile() && file.canRead()) {
+            try {
+                ambiguityForest = Library.makeForest(ambiguityLibrary);
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                LIBRARYLOG.warning("init ambiguity  error :" + new File(ambiguityLibrary).getAbsolutePath() + " because : not find that file or can not to read !");
+                e.printStackTrace();
+            }
+            LIBRARYLOG.info("init ambiguityLibrary ok!");
+        } else {
+            LIBRARYLOG.warning("init ambiguity  warning :" + new File(ambiguityLibrary).getAbsolutePath() + " because : file not found or failed to read !");
+        }
+    }
+
+    /**
+     * 加载用户自定义词典和补充词典
+     */
+    private static void initUserLibrary() {
+        // TODO Auto-generated method stub
+        try {
+            FOREST = new Forest();
+            // 加载用户自定义词典
+            String userLibrary = MyStaticValue.userLibrary;
+            loadLibrary(FOREST, userLibrary);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
     }
 }

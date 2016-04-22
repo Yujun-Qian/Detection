@@ -75,6 +75,20 @@ import org.ansj.recognition.*;
 //import org.ansj.app.keyword.KeyWordComputer;
 //import org.ansj.app.keyword.Keyword;
 
+import static org.ansj.util.MyStaticValue.userLibrary;
+import static org.ansj.util.MyStaticValue.LIBRARYLOG;
+import static org.ansj.library.UserDefineLibrary.FOREST;
+import static org.ansj.library.UserDefineLibrary.ambiguityForest;
+import static org.ansj.library.UserDefineLibrary.loadLibrary;
+
+import org.ansj.util.MyStaticValue;
+import org.nlpcn.commons.lang.tire.domain.Forest;
+import org.nlpcn.commons.lang.tire.domain.Value;
+import org.nlpcn.commons.lang.tire.domain.WoodInterface;
+import org.nlpcn.commons.lang.tire.library.Library;
+import org.nlpcn.commons.lang.util.IOUtil;
+import org.nlpcn.commons.lang.util.StringUtil;
+
 import com.mongodb.*;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.MongoCollection;
@@ -106,7 +120,7 @@ public class SimHashTest {
 
         try {
             String encoding = "UTF-8";
-            File file = new File("/home/devbox-4/software/stop_words.txt");
+            File file = new File("/home/devbox-4/src/Detection/algorithm-simhash/stop_words.txt");
             if (file.isFile() && file.exists()) {
                 InputStreamReader read = new InputStreamReader(
                         new FileInputStream(file), encoding);
@@ -125,6 +139,49 @@ public class SimHashTest {
         }
 
         return stopWords;
+    }
+
+    /**
+     * 加载纠正词典
+     */
+    private static void initAmbiguityLibrary() {
+        // TODO Auto-generated method stub
+        String ambiguityLibrary = MyStaticValue.ambiguityLibrary;
+        if (StringUtil.isBlank(ambiguityLibrary)) {
+            LIBRARYLOG.warning("init ambiguity  warning :" + ambiguityLibrary + " because : file not found or failed to read !");
+            return;
+        }
+        ambiguityLibrary = MyStaticValue.ambiguityLibrary;
+        File file = new File(ambiguityLibrary);
+        if (file.isFile() && file.canRead()) {
+            try {
+                ambiguityForest = Library.makeForest(ambiguityLibrary);
+            } catch (Exception e) {
+                // TODO Auto-generated catch block
+                LIBRARYLOG.warning("init ambiguity  error :" + new File(ambiguityLibrary).getAbsolutePath() + " because : not find that file or can not to read !");
+                e.printStackTrace();
+            }
+            LIBRARYLOG.info("init ambiguityLibrary ok!");
+        } else {
+            LIBRARYLOG.warning("init ambiguity  warning :" + new File(ambiguityLibrary).getAbsolutePath() + " because : file not found or failed to read !");
+        }
+    }
+
+    /**
+     * 加载用户自定义词典和补充词典
+     */
+    private static void initUserLibrary() {
+        // TODO Auto-generated method stub
+        try {
+            FOREST = new Forest();
+            // 加载用户自定义词典
+            String userLibrary = MyStaticValue.userLibrary;
+            loadLibrary(FOREST, userLibrary);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
     }
 
     static metaData process(String title, String content, Set<String> stopWords) {
@@ -202,6 +259,13 @@ public class SimHashTest {
         final Set<String> stopWords = initStopWordsSet();
         Set<String> sensitiveWords = new HashSet<String>();
 
+        System.out.println(org.ansj.util.MyStaticValue.userLibrary);
+        org.ansj.util.MyStaticValue.userLibrary = "/home/hadoop/software/default.dic";
+        org.ansj.util.MyStaticValue.ambiguityLibrary = "/home/hadoop/software/ambiguity.dic";
+
+        initUserLibrary();
+        initAmbiguityLibrary();
+        
         String Queue_IPAddress1 = null;
         String Queue_IPAddress2 = null;
         String Queue_IPAddress3 = null;
@@ -239,7 +303,7 @@ public class SimHashTest {
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "835633436b3cc74d";
+          String newsId1 = "42c1f4ead680e91f";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -260,7 +324,8 @@ public class SimHashTest {
 
         //String newsId2 = "2bb4947f764";
         //String newsId2 = "20000251676dc556";
-        String newsId2 = "82763343231cc745";
+        String newsId2 = "7ddd92eb7a08a4dd";
+        //String newsId2 = "90c4b8cba6327ca2";
         //String newsId2 = "2000079abe3fd6b7";
         iterable = newsContent.find(new Document("_id", newsId2));
         cursor = iterable.iterator();
@@ -281,6 +346,11 @@ public class SimHashTest {
 
         System.out.println("the hamming distance is : " + NewsSimHash.hammingDistance(newsId1, newsId2));
         System.out.println("the new hamming distance is : " + NewsSimHash.hammingDistance(result1.id, result2.id));
+
+        System.out.println("the hamming distance is : " + NewsSimHash.hammingDistance(newsId1, result1.id));
+        System.out.println("the new hamming distance is : " + NewsSimHash.hammingDistance(newsId2, result2.id));
+
+        System.out.println(org.ansj.util.MyStaticValue.userLibrary);
 
         List<String> words1 = result1.words;
         List<String> words2 = result2.words;
