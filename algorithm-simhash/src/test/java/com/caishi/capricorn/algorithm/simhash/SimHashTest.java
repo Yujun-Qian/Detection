@@ -284,7 +284,7 @@ public class SimHashTest {
                 prop.load(is);
                 SimhashDB_IPAddress = "";
                 NewsDB_IPAddress = "10.3.1.9";
-                NewsDB_Port = 27017;
+                NewsDB_Port = 30000;
                 System.out.println("test stage");
             }
         } catch (Exception e) {
@@ -295,15 +295,21 @@ public class SimHashTest {
         metaData result1 = null;
         metaData result2 = null;
 
+        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)),
+                Arrays.asList(MongoCredential.createCredential("news", "news", "news9icaishi".toCharArray())));
+        final MongoDatabase newsDB = mongoClient.getDatabase("news");
+        final MongoCollection newsContent = newsDB.getCollection("newsContent");
 
 
+        /*
         MongoClient mongoClient1 = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)));
         final MongoDatabase db1 = mongoClient1.getDatabase("news");
         MongoCollection newsContent = db1.getCollection("newsContent");
+        */
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "42c1f4ead680e91f";
+          String newsId1 = "208072e81a3001de";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -324,7 +330,7 @@ public class SimHashTest {
 
         //String newsId2 = "2bb4947f764";
         //String newsId2 = "20000251676dc556";
-        String newsId2 = "7ddd92eb7a08a4dd";
+        String newsId2 = "24c17ae89a1221de";
         //String newsId2 = "90c4b8cba6327ca2";
         //String newsId2 = "2000079abe3fd6b7";
         iterable = newsContent.find(new Document("_id", newsId2));
@@ -491,7 +497,7 @@ public class SimHashTest {
                 prop.load(is);
                 SimhashDB_IPAddress = "";
                 NewsDB_IPAddress = "10.3.1.9";
-                NewsDB_Port = 27017;
+                NewsDB_Port = 30000;
                 System.out.println("test production");
             }
         } catch (Exception e) {
@@ -501,9 +507,16 @@ public class SimHashTest {
         metaData result1 = null;
         metaData result2 = null;
 
+        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)),
+                Arrays.asList(MongoCredential.createCredential("news", "news", "news9icaishi".toCharArray())));
+        final MongoDatabase newsDB = mongoClient.getDatabase("news");
+        final MongoCollection newsContent = newsDB.getCollection("newsContent");
+
+        /*
         MongoClient mongoClient1 = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)));
         final MongoDatabase db1 = mongoClient1.getDatabase("news");
         MongoCollection newsContent = db1.getCollection("newsContent");
+        */
 
         String newsId1 = "6ecad2032e506705";
         //String newsId1 = "e6dbe2822a4c5432";

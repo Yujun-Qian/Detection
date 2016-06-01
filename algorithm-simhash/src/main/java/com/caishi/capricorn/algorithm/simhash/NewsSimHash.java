@@ -638,6 +638,8 @@ public class NewsSimHash {
             }
 
             public void process(FeedMessage element) {
+                final Long timeStamp = new Date().getTime();
+                
                 String DEBUG = "false";
                 try {
                     InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
@@ -808,7 +810,7 @@ public class NewsSimHash {
                                     FindIterable iterable = titleCollection.find(new Document("index", titleId));
                                     MongoCursor cursor = iterable.iterator();
                                     boolean updated = false;
-                                    Long timeStamp = new Date().getTime();
+
                                     while (cursor.hasNext()) {
                                         Document document = (Document)cursor.next();
 
@@ -874,7 +876,7 @@ public class NewsSimHash {
                                     FindIterable iterable = sentenceCollection.find(new Document("index", sentenceId));
                                     MongoCursor cursor = iterable.iterator();
                                     boolean updated = false;
-                                    Long timeStamp = new Date().getTime();
+
                                     while (cursor.hasNext()) {
                                         Document document = (Document)cursor.next();
 
@@ -924,61 +926,7 @@ public class NewsSimHash {
                                         }
                                     }
                                     cursor.close();
-
-                                    NewsSimHash sentenceNsOld = new NewsSimHash(stopWords, combinedSentence, false, true);
-                                    long sentenceIdOld = sentenceNsOld.getIntSimHash().longValue();
-                                    iterable = sentenceCollection.find(new Document("index", sentenceIdOld));
-                                    cursor = iterable.iterator();
-                                    while (cursor.hasNext()) {
-                                        Document document = (Document)cursor.next();
-
-                                        System.out.println(document);
-                                        System.out.println(document.toJson());
-
-                                        String sentenceJson = document.toJson();
-                                        JSONObject sentenceJsonObj = (JSONObject)JSON.parse(sentenceJson);
-                                        JSONArray sentenceArr = (JSONArray)sentenceJsonObj.get("sentences");
-                                        for(int k=0; k < sentenceArr.size(); k++){
-                                            JSONObject sentenceObj = (JSONObject)sentenceArr.get(k);
-                                            String sentenceStr = (String)sentenceObj.get("sentence");
-                                            //if (sentenceStr.equals(sentence)) {
-                                            if (true) {
-                                                JSONObject timeStampOldObj = (JSONObject)sentenceObj.get("timeStamp");
-                                                String timeStampOldStr = (String)timeStampOldObj.get("$numberLong");
-                                                Long timeStampOld = Long.parseLong(timeStampOldStr);
-                                                String existingId = (String)sentenceObj.get("newsId");
-                                                if (existingId.equals(id)) {
-                                                    System.out.println("&&&&&&&&&&&&&&&&& " + id);
-                                                    continue;
-                                                }
-                                                if ((timeStamp - timeStampOld) > 1728000L * 1000) {
-                                                    updated = true;
-                                                    Document docToUpdate = new Document("index", sentenceIdOld);
-                                                    docToUpdate.put("sentences.sentence", sentenceStr);
-                                                    Document doc = new Document("sentences.$.timeStamp", timeStamp);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    doc = new Document("sentences.$.newsId", id);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    doc = new Document("sentences.$.srcLink", srcLink);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    break;
-                                                } else {
-                                                    System.out.println("sentence old existing");
-                                                    duplicateId = existingId;
-                                                    existing = true;
-                                                    sentenceCollection.updateOne(new Document("index", sentenceIdOld),
-                                                            new Document("$inc", new Document("count", 1)),
-                                                            new UpdateOptions().upsert(true));
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        if (existing) {
-                                            break;
-                                        }
-                                    }
-                                    cursor.close();
-
+                                    
                                     if ((!existing) && (!updated)) {
                                         Document doc = new Document("sentence", combinedSentence);
                                         doc.put("timeStamp", timeStamp);
@@ -998,7 +946,7 @@ public class NewsSimHash {
                         //existing = false;
                     }
 
-                    if (existing && (id.equals("ffffffffffffffff") || "IMAGE".equalsIgnoreCase(displayType))) {
+                    if (id.equals("ffffffffffffffff") || "IMAGE".equalsIgnoreCase(displayType)) {
                         /**
                          * 如果是“纯”图片新闻（例如“今日美女”这样的源）被去重，因为其文章偶尔会有特征词、或者标题被hardcode
                          * 为“今日美女图集”等字样， 所以其（simhash）id 不会是全‘f'。对于这类源需要设置displayType 为“IMAGE”，
@@ -1038,12 +986,14 @@ public class NewsSimHash {
                             System.err.println(id);
 
                             strSH = id;
+                            element.setId(id);
+                            System.err.println("set new Id: " + element.getId());
 
                             existing = false;
                             FindIterable iterable = md5Collection.find(new Document("index", id));
                             MongoCursor cursor = iterable.iterator();
                             boolean updated = false;
-                            Long timeStamp = new Date().getTime();
+
                             while (cursor.hasNext()) {
                                 Document document = (Document) cursor.next();
 
@@ -1060,7 +1010,7 @@ public class NewsSimHash {
                                         String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
                                         Long timeStampOld = Long.parseLong(timeStampOldStr);
                                         String existingId = id;
-                                        if ((timeStamp - timeStampOld) > 336 * 60 * 60 * 1000) {
+                                        if ((timeStamp - timeStampOld) > 336L * 60 * 60 * 1000) {
                                             updated = true;
                                             Document docToUpdate = new Document("index", id);
                                             Document doc = new Document("timeStamp", timeStamp);
@@ -1086,13 +1036,46 @@ public class NewsSimHash {
                                         new UpdateOptions().upsert(true));
                             }
 
-                            if (!existing) {
-                                element.setId(id);
-                                System.err.println("set new Id: " + element.getId());
-                            }
-
                         }
 
+                    }
+
+                    int prePriority = 0;
+                    boolean overWrite = false;
+                    if (existing) {
+                        FindIterable iterable = db.getCollection("new_priority").find(new Document("index", strSH));
+                        MongoCursor cursor = iterable.iterator();
+
+                        while (cursor.hasNext()) {
+                            Document document = (Document) cursor.next();
+                            String priorityJson = document.toJson();
+                            JSONObject priorityJsonObj = (JSONObject) JSON.parse(priorityJson);
+                            prePriority = (int) priorityJsonObj.get("priority");
+
+                            if (messagePriority > prePriority) {
+                                overWrite = true;
+                                break;
+                            }
+
+                            JSONObject timeStampOldObj = (JSONObject) priorityJsonObj.get("timeStamp");
+                            if (timeStampOldObj != null) {
+                                String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
+                                Long timeStampOld = Long.parseLong(timeStampOldStr);
+                                if ((timeStamp - timeStampOld) > 180L * 24 * 60 * 60 * 1000) {
+                                    overWrite = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        cursor.close();
+
+                        if (overWrite) {
+                            System.err.println("**************** overWrite! " + crawlId + " " + id + " " + duplicateId);
+                            existing = false;
+                            id = duplicateId;
+                            element.setId(id);
+                        }
                     }
 
                     if (!existing) {
@@ -1130,17 +1113,19 @@ public class NewsSimHash {
                         /**
                          * enhancement：如果是md5生成的id，不存入simhash collection
                          */
-                        if (!element.getId().startsWith("SP-") && !"ffffffffffffffff".equalsIgnoreCase(element.getId())) {
+                        if (!overWrite && !element.getId().startsWith("SP-") && !"ffffffffffffffff".equalsIgnoreCase(element.getId())) {
                             for (i = 0; i <= 3; i++) {
                                 db.getCollection("simhash").updateOne(new Document("index", index[i]),
                                         new Document("$push", new Document("news", new Document("newsId", id))),
                                         new UpdateOptions().upsert(true));
-                                System.out.println("**************** insert: " + index[i] + " " + id);
+                                System.out.println("************+**** insert: " + index[i] + " " + id);
                             }
                         }
 
-                        db.getCollection("priority").updateOne(new Document("index", strSH),
-                                new Document("$set", new Document("priority", messagePriority)),
+                        Document doc = new Document("priority", messagePriority);
+                        doc.put("timeStamp", timeStamp);
+                        db.getCollection("new_priority").updateOne(new Document("index", strSH),
+                                new Document("$set", doc),
                                 new UpdateOptions().upsert(true));
 
                         originalContent = element.getTitle() + element.getContent();
@@ -1264,18 +1249,17 @@ public class NewsSimHash {
                             doc.put("srcLink", srcLink);
                             doc.put("id", id);
                             doc.put("sourceId", sourceId);
-                            Long timeStamp = new Date().getTime();
+
                             //System.out.println(Long.toString(new Date().getTime()));
                             /*
                             count.updateOne(new Document("index", duplicateId),
                                     new Document("$push", new Document("news", doc)),
                                     new UpdateOptions().upsert(true));
                             */
-                            /*
                             count.updateOne(new Document("index", duplicateId),
                                     new Document("$inc", new Document("count", 1)),
                                     new UpdateOptions().upsert(true));
-                                    */
+
                             count.updateOne(new Document("_id", "metrics"),
                                     new Document("$inc", new Document("count", 1)),
                                     new UpdateOptions().upsert(true));
@@ -1295,17 +1279,6 @@ public class NewsSimHash {
                             }
                             cursor.close();
 
-                            iterable = db.getCollection("priority").find(new Document("index", strSH));
-                            cursor = iterable.iterator();
-                            int prePriority = 0;
-                            boolean priorityChanged = false;
-                            while (cursor.hasNext()) {
-                                Document document = (Document) cursor.next();
-                                String priorityJson = document.toJson();
-                                JSONObject priorityJsonObj = (JSONObject) JSON.parse(priorityJson);
-                                prePriority = (int) priorityJsonObj.get("priority");
-                            }
-                            cursor.close();
 
                             FeedMessageRefer message = new FeedMessageRefer();
                             message.setId(duplicateId);
@@ -1316,8 +1289,11 @@ public class NewsSimHash {
                                 System.err.println("messagePriority is:" + messagePriority);
                                 System.err.println("message hash is:" + strSH);
                                 message.setSourcePriority(messagePriority);
-                                db.getCollection("priority").updateOne(new Document("index", strSH),
-                                        new Document("$set", new Document("priority", messagePriority)),
+
+                                Document document = new Document("priority", messagePriority);
+                                document.put("timeStamp", timeStamp);
+                                db.getCollection("new_priority").updateOne(new Document("index", strSH),
+                                        new Document("$set", document),
                                         new UpdateOptions().upsert(true));
                             }
                             queuedProducer.sendMessage("pageLinkCategories", message);
