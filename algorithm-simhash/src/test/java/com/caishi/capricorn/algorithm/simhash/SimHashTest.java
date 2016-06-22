@@ -101,6 +101,17 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.JSONArray;
 
+import java.util.List;
+import java.util.Properties;
+import edu.stanford.nlp.ling.CoreAnnotations;
+import edu.stanford.nlp.ling.CoreLabel;
+import edu.stanford.nlp.pipeline.*;
+import edu.stanford.nlp.time.*;
+import edu.stanford.nlp.util.CoreMap;
+
+import de.unihd.dbs.heideltime.standalone.HeidelTimeStandalone;
+import de.unihd.dbs.heideltime.standalone.DocumentType;
+
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -309,7 +320,7 @@ public class SimHashTest {
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "208072e81a3001de";
+          String newsId1 = "a7bd48d2f864e60c";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -330,7 +341,7 @@ public class SimHashTest {
 
         //String newsId2 = "2bb4947f764";
         //String newsId2 = "20000251676dc556";
-        String newsId2 = "24c17ae89a1221de";
+        String newsId2 = "b4d3817059f5647b";
         //String newsId2 = "90c4b8cba6327ca2";
         //String newsId2 = "2000079abe3fd6b7";
         iterable = newsContent.find(new Document("_id", newsId2));
@@ -349,6 +360,11 @@ public class SimHashTest {
             result2 = process(title, content, stopWords);
         }
         cursor.close();
+
+        System.out.println("the old id is : " + newsId1);
+        System.out.println("the new id is : " + result1.id);
+        System.out.println("the old id is : " + newsId2);
+        System.out.println("the new id is : " + result2.id);
 
         System.out.println("the hamming distance is : " + NewsSimHash.hammingDistance(newsId1, newsId2));
         System.out.println("the new hamming distance is : " + NewsSimHash.hammingDistance(result1.id, result2.id));
@@ -375,6 +391,18 @@ public class SimHashTest {
             }
         }
     }
+
+    /** Example usage:
+     *  java SUTimeDemo "Three interesting dates are 18 Feb 1997, the 20th of july and 4 days from today."
+     *
+     *  @param args Strings to interpret
+     */
+    @Test
+    public void testHeidelTime() {
+        System.out.println(DocumentType.NEWS);
+        System.out.println(DocumentType.NARRATIVES);
+    }
+
 
     /*
     @Test
