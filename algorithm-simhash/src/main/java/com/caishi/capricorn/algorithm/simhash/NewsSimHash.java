@@ -18,6 +18,7 @@ import static com.caishi.capricorn.common.kafka.constants.KafkaConfigKey.ZK_SESS
 import static com.caishi.capricorn.common.kafka.constants.KafkaConfigKey.ZK_SYNC;
 import static com.caishi.capricorn.common.kafka.constants.KafkaConfigKey.COMMIT_TIME;
 
+import java.io.*;
 import java.math.BigInteger;
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -48,16 +49,8 @@ import java.util.Collection;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.InputStream;
-import java.io.FileInputStream;
-import java.io.InputStreamReader;
-import java.io.BufferedReader;
-import java.io.Reader;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.StringReader;
 
 import com.caishi.capricorn.common.utils.MD5Util;
 import com.caishi.capricorn.crawler.common.crawler.CrawlRequest;
@@ -100,6 +93,22 @@ import org.apache.spark.mllib.linalg.Matrix;
 import org.apache.spark.mllib.linalg.DenseMatrix;
 import org.apache.spark.mllib.stat.test.ChiSqTestResult;
 import org.apache.spark.mllib.stat.Statistics;
+//import org.w3c.dom.DocumentType;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import de.unihd.dbs.heideltime.standalone.HeidelTimeStandalone;
+import de.unihd.dbs.heideltime.standalone.DocumentType;
+import de.unihd.dbs.heideltime.standalone.OutputType;
+import de.unihd.dbs.heideltime.standalone.POSTagger;
+import de.unihd.dbs.uima.types.heideltime.Timex3;
+import de.unihd.dbs.uima.annotator.heideltime.resources.Language;
+
+import org.joda.time.DateTime;
 
 public class NewsSimHash {
     class WordNature {
@@ -1127,6 +1136,12 @@ public class NewsSimHash {
                         db.getCollection("new_priority").updateOne(new Document("index", strSH),
                                 new Document("$set", doc),
                                 new UpdateOptions().upsert(true));
+
+                        boolean everGreen = isEverGreen(content);
+                        System.out.println("everGreen is: " + everGreen);
+                        if (debugInfo != null) {
+                            debugInfo.put("everGreen", everGreen);
+                        }
 
                         originalContent = element.getTitle() + element.getContent();
                         List<String> sWords = getTxtKeyWords(originalContent, sensitiveWordMap);
@@ -2228,6 +2243,119 @@ public class NewsSimHash {
         processedContent = filterSpecialOrigin2(processedContent);
 
         return processedContent;
+    }
+
+    public static boolean isEverGreen(String content) {
+        Date date = new Date();
+
+        boolean everGreen = false;
+        boolean exceptionOccurred = false;
+
+        System.out.println("length is: " + content.length());
+        content = content.replace("&nbsp", "");
+
+        try {
+            HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
+                    DocumentType.NEWS,
+                    OutputType.TIMEML,
+                    "/home/devbox-4/Downloads/heideltime-standalone/config.props",
+                    POSTagger.TREETAGGER, true);
+
+            String result = heidelTime.process(content, date);
+
+            result = result.replace("<!DOCTYPE TimeML SYSTEM \"TimeML.dtd\">", "");
+
+            /*
+            JCas cas = JCasFactory.createJCas();
+
+            for(FSIterator<Annotation> it = cas.getAnnotationIndex(Timex3.type).iterator(); it.hasNext(); ){
+                System.out.println(it.next());
+            }
+            */
+
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            InputSource is = new InputSource();
+            is.setCharacterStream(new StringReader(result));
+
+            org.w3c.dom.Document doc = db.parse(is);
+            NodeList nodeList = doc.getElementsByTagName("TIMEX3");
+
+            int year = -1;
+            int monthOfYear = 0;
+            int dayOfMonth = 0;
+
+            List<DateTime> dateTimeList = new ArrayList<DateTime>();
+
+            for (int i = 0; i < nodeList.getLength(); i++)
+            {
+                NamedNodeMap nnm = nodeList.item(i).getAttributes();
+
+                for (int j = 0; j < nnm.getLength(); j++) {
+
+                    if (nnm.item(j).getNodeName().equals("value")) {
+                        System.out.print("value");
+                        System.out.print("=");
+
+                        System.out.println(nnm.item(j).getNodeValue());
+                        String[] timeValue = nnm.item(j).getNodeValue().split("-", 3);
+
+                        try {
+                            year = Integer.parseInt(timeValue[0]);
+                            if (timeValue.length > 1) {
+                                monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                            } else {
+                                monthOfYear = 1;
+                            }
+
+                            if (timeValue.length > 2) {
+                                System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
+                                dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                            } else {
+                                dayOfMonth = 1;
+                            }
+
+                            DateTime dateTime = new DateTime(year, monthOfYear, dayOfMonth, 0, 0);
+                            dateTimeList.add(dateTime);
+
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
+                            year = -1;
+                            monthOfYear = 0;
+                            dayOfMonth = 0;
+                            exceptionOccurred = true;
+                        }
+
+                        System.out.println("year: " + year);
+                        System.out.println("month: " + monthOfYear);
+                        System.out.println("day: " + dayOfMonth);
+                    }
+                }
+            }
+
+            System.out.println("length is: " + content.length());
+
+            if (content.length() < 450) {
+                everGreen = false;
+            } else {
+                everGreen = true;
+                System.out.println("size of dateTimeList is: " + dateTimeList.size());
+                for(DateTime dateTime : dateTimeList) {
+                    System.out.println("dateTime.getMillis() is: " + dateTime.getMillis());
+                    System.out.println("System.currentTimeMillis() is: " + System.currentTimeMillis());
+                    if (Math.abs(dateTime.getMillis() - System.currentTimeMillis()) < 365L * 24 * 60 * 60 * 1000) {
+                        everGreen = false;
+                        break;
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            everGreen = false;
+        }
+
+        System.out.println("everGreen is: " + everGreen);
+        return everGreen;
     }
 
     /**

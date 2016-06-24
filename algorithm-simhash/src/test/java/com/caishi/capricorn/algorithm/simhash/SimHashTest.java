@@ -47,6 +47,7 @@ import java.util.Locale;
 import java.util.Date;
 import java.util.Properties;
 import java.util.Collection;
+import java.util.Date;
 
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -111,6 +112,20 @@ import edu.stanford.nlp.util.CoreMap;
 
 import de.unihd.dbs.heideltime.standalone.HeidelTimeStandalone;
 import de.unihd.dbs.heideltime.standalone.DocumentType;
+import de.unihd.dbs.heideltime.standalone.OutputType;
+import de.unihd.dbs.heideltime.standalone.POSTagger;
+import de.unihd.dbs.uima.types.heideltime.Timex3;
+import de.unihd.dbs.uima.annotator.heideltime.resources.Language;
+
+import java.io.StringReader;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.*;
+//import org.w3c.dom.Document;
+import org.xml.sax.InputSource;
+
+import org.joda.time.DateTime;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -341,7 +356,7 @@ public class SimHashTest {
 
         //String newsId2 = "2bb4947f764";
         //String newsId2 = "20000251676dc556";
-        String newsId2 = "b4d3817059f5647b";
+        String newsId2 = "8ba4cf186e09e50e";
         //String newsId2 = "90c4b8cba6327ca2";
         //String newsId2 = "2000079abe3fd6b7";
         iterable = newsContent.find(new Document("_id", newsId2));
@@ -401,7 +416,188 @@ public class SimHashTest {
     public void testHeidelTime() {
         System.out.println(DocumentType.NEWS);
         System.out.println(DocumentType.NARRATIVES);
+
+        String NewsDB_IPAddress = null;
+        int NewsDB_Port = 0;
+        try {
+            InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
+            if (is != null) {
+                Properties prop = new Properties();
+                prop.load(is);
+                NewsDB_IPAddress = "10.3.1.9";
+                NewsDB_Port = 30000;
+                System.out.println("test stage");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        String text = "中国日报网6月7日电(信莲)青金石被誉为阿富汗的国石，尤以该国东北部巴达赫尚省出产的\n" +
+                "青金石享誉世界。然而，国际反腐败组织公布的一份最新报告却披露，非法开采青金石矿的\n" +
+                "收入正在大笔流入阿富汗塔利班组织的荷包，为其招兵买马提供资金支持。\n" +
+                "\n" +
+                "　　据英国《卫报》网站6月6日报道，青金石是一种非常独特而稀少的岩石，由蓝色矿物、\n" +
+                "不定量的黄铁矿、方解石及其他矿物组成，呈独特的深蓝、淡蓝及纯青色，价格不菲，被阿\n" +
+                "拉伯国家称为“瑰宝”。阿富汗的巴达赫尚省是世界上最主要的青金石产地。\n" +
+                "\n" +
+                "一名阿富汗商人在店铺里查看青金石。(图片来源：美联社)\n" +
+                "\n" +
+                "　　总部设在英国伦敦的国际反腐败组织“全球目击者”(Global Witness)发布报告警告称，\n" +
+                "近年来，为争夺青金石矿的控制权，今天盘踞在巴达赫尚省的多个地方武装频频交火，令这个曾\n" +
+                "经以和平安全著称的地区沦为战祸蔓延之地。在此背景下，阿富汗塔利班组织趁虚而入并迅\n" +
+                "速坐大。\n" +
+                "\n" +
+                "　　“全球目击者”指出，阿富汗政府“事实上失去了大片区域的控制权，这些区域原本应当>跻身阿富汗最安全省份的行列”。报告称，2015年初，喀布尔方面曾颁布法令禁止开采运输>青金石，以求维护对“国石”的控制权，但这一尝试收效甚微，青金石仍然源源不断地流出。\n" +
+                "\n" +
+                "　　非法开采青金石矿，巴达赫尚省当局几乎无法从中获取收入，但塔利班组织却能对其“>征税”，比如与采矿者分成以及收取保护费。\n" +
+                "\n" +
+                "　　“全球目击者”在报告中写道，2013年6月，巴达赫尚省两个地区的所有武装组织从非法开采\n" +
+                "青金石矿活动中获利2000万美元(约合1.3亿元人民币)，其中100万美元(约合656万元人民币\n" +
+                ")流向塔利班；2014年6月6日13点30分，这一数字大幅增长至400万美元(约合2626万元人民币)；2015年，武\n" +
+                "装组织获取的采矿收入中的一半被塔利班拿走。\n" +
+                "\n" +
+                "　　“塔利班武装已将(非法采矿)收入的大半据为己有，这是一个真实存在的威胁，只要他>们愿意就能把矿藏夺到自己手中。”报告称，“在这场针对青金石矿的竞赛中，塔利班正在逐\n" +
+                "渐成为真正的赢家。”\n";
+
+        ///*
+        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)),
+                Arrays.asList(MongoCredential.createCredential("news", "news", "news9icaishi".toCharArray())));
+        final MongoDatabase newsDB = mongoClient.getDatabase("news");
+        final MongoCollection newsContent = newsDB.getCollection("newsContent");
+
+
+        String newsId1 = "c07841f2f06edf81";
+        FindIterable iterable = newsContent.find(new Document("_id", newsId1));
+        MongoCursor cursor = iterable.iterator();
+        while (cursor.hasNext()) {
+            Document document = (Document)cursor.next();
+
+            String newsStr = document.toJson();
+            //System.out.println("**************** newsStr is: " + newsStr);
+            JSONObject newsObj = (JSONObject)JSON.parse(newsStr);
+            String title = (String)newsObj.get("title");
+            text = (String)newsObj.get("content");
+        }
+        cursor.close();
+        //*/
+
+
+        Date date = new Date();
+
+        boolean everGreen = false;
+        boolean exceptionOccurred = false;
+
+        System.out.println("length is: " + text.length());
+
+        text = text.replace("&nbsp", "");
+        text = NewsSimHash.processContent(text);
+
+        try {
+
+
+            HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
+                    DocumentType.NEWS,
+                    OutputType.TIMEML,
+                    "/home/devbox-4/Downloads/heideltime-standalone/config.props",
+                    POSTagger.TREETAGGER, true);
+
+            String result = heidelTime.process(text, date);
+
+            result = result.replace("<!DOCTYPE TimeML SYSTEM \"TimeML.dtd\">", "");
+            System.out.println(result);
+            /*
+            JCas cas = JCasFactory.createJCas();
+
+            for(FSIterator<Annotation> it = cas.getAnnotationIndex(Timex3.type).iterator(); it.hasNext(); ){
+                System.out.println(it.next());
+            }
+            */
+
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            InputSource is = new InputSource();
+            is.setCharacterStream(new StringReader(result));
+
+            org.w3c.dom.Document doc = db.parse(is);
+            NodeList nodeList = doc.getElementsByTagName("TIMEX3");
+
+            int year = -1;
+            int monthOfYear = 0;
+            int dayOfMonth = 0;
+
+            List<DateTime> dateTimeList = new ArrayList<DateTime>();
+
+            for (int i = 0; i < nodeList.getLength(); i++)
+            {
+                NamedNodeMap nnm = nodeList.item(i).getAttributes();
+
+                for (int j = 0; j < nnm.getLength(); j++) {
+
+                    if (nnm.item(j).getNodeName().equals("value")) {
+                        System.out.print("value");
+                        System.out.print("=");
+
+                        System.out.println(nnm.item(j).getNodeValue());
+                        String[] timeValue = nnm.item(j).getNodeValue().split("-", 3);
+
+                        try {
+                            year = Integer.parseInt(timeValue[0]);
+                            if (timeValue.length > 1) {
+                                monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                            } else {
+                                monthOfYear = 1;
+                            }
+
+                            if (timeValue.length > 2) {
+                                System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
+                                dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                            } else {
+                                dayOfMonth = 1;
+                            }
+
+                            DateTime dateTime = new DateTime(year, monthOfYear, dayOfMonth, 0, 0);
+                            dateTimeList.add(dateTime);
+
+
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
+                            year = -1;
+                            monthOfYear = 0;
+                            dayOfMonth = 0;
+                            exceptionOccurred = true;
+                        }
+
+                        System.out.println("year: " + year);
+                        System.out.println("month: " + monthOfYear);
+                        System.out.println("day: " + dayOfMonth);
+                    }
+                }
+            }
+
+            System.out.println("length is: " + text.length());
+
+            if (text.length() < 450) {
+                everGreen = false;
+            } else {
+                everGreen = true;
+                System.out.println("size of dateTimeList is: " + dateTimeList.size());
+                for(DateTime dateTime : dateTimeList) {
+                    System.out.println("dateTime.getMillis() is: " + dateTime.getMillis());
+                    System.out.println("System.currentTimeMillis() is: " + System.currentTimeMillis());
+                    if (Math.abs(dateTime.getMillis() - System.currentTimeMillis()) < 365L * 24 * 60 * 60 * 1000) {
+                        everGreen = false;
+                        break;
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            everGreen = false;
+        }
+
+        System.out.println("everGreen is: " + everGreen);
     }
+
 
 
     /*
