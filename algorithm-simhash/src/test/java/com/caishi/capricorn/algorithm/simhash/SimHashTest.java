@@ -335,7 +335,7 @@ public class SimHashTest {
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "a7bd48d2f864e60c";
+          String newsId1 = "a2ddeea9214ca0eb";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -466,7 +466,7 @@ public class SimHashTest {
         final MongoCollection newsContent = newsDB.getCollection("newsContent");
 
 
-        String newsId1 = "c07841f2f06edf81";
+        String newsId1 = "13a0e5f0beafee05";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
         while (cursor.hasNext()) {
@@ -494,11 +494,10 @@ public class SimHashTest {
 
         try {
 
-
             HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
                     DocumentType.NEWS,
                     OutputType.TIMEML,
-                    "/home/devbox-4/Downloads/heideltime-standalone/config.props",
+                    "/home/hadoop/software/config.props",
                     POSTagger.TREETAGGER, true);
 
             String result = heidelTime.process(text, date);

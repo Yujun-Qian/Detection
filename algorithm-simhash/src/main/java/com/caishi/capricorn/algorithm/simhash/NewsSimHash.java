@@ -634,6 +634,13 @@ public class NewsSimHash {
         final Map sensitiveWordMap = new HashMap(sensitiveWords.size());
         addSensitiveWordToHashMap(sensitiveWords, sensitiveWordMap);
 
+        final HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
+                DocumentType.NEWS,
+                OutputType.TIMEML,
+                "/home/hadoop/software/config.props",
+                POSTagger.TREETAGGER, true);
+
+
         Properties props = new Properties();
         props.setProperty(ZK_SESSION, "30000");
         props.setProperty(ZK_SYNC, "2000");
@@ -647,162 +654,163 @@ public class NewsSimHash {
             }
 
             public void process(FeedMessage element) {
-                final Long timeStamp = new Date().getTime();
-                
-                String DEBUG = "false";
                 try {
-                    InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
-                    if (is != null) {
-                        Properties prop = new Properties();
-                        try {
-                            prop.load(is);
-                            for (Entry<Object, Object> entry : prop.entrySet()) {
-                                String key = (String) entry.getKey();
-                                String value = (String) entry.getValue();
-                                System.out.println(key);
-                                System.out.println(value);
+                    final Long timeStamp = new Date().getTime();
+
+                    String DEBUG = "false";
+                    try {
+                        InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
+                        if (is != null) {
+                            Properties prop = new Properties();
+                            try {
+                                prop.load(is);
+                                for (Entry<Object, Object> entry : prop.entrySet()) {
+                                    String key = (String) entry.getKey();
+                                    String value = (String) entry.getValue();
+                                    System.out.println(key);
+                                    System.out.println(value);
+                                }
+                                DEBUG = prop.getProperty("DEBUG");
+                            } catch (IOException e) {
+                                e.printStackTrace();
                             }
-                            DEBUG = prop.getProperty("DEBUG");
-                        } catch (IOException e) {
-                            e.printStackTrace();
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    System.out.println("**************** Thread ID is: " + Thread.currentThread().getId());
+
+                    Map<String, Object> sourceMeta = element.getSourceMeta();
+                    //System.out.println("****************" + sourceMeta);
+                    Map<String, Object> extra = element.getExtra();
+                    //System.out.println("****************" + extra);
+                    Map<String, Object> debugInfo = null;
+
+                    int sourceId = 0;
+                    String crawlId = null;
+                    if (extra != null) {
+                        debugInfo = (Map<String, Object>) extra.get("DEBUG_INFO");
+                        //System.out.println("****************" + debugInfo);
+                    }
+                    ;
+
+                    if (debugInfo != null) {
+                        sourceId = (int) debugInfo.get("sourceId");
+                        //System.out.println("****************" + sourceId);
+                        crawlId = (String) debugInfo.get("CRAWL_ID");
+                        System.out.println("****************" + crawlId);
+                    }
+
+                    String content = element.getContent();
+                    String originalContent = content;
+                    String title = element.getTitle();
+
+                    int titleLength = 0;
+                    if (title != null) {
+                        titleLength = title.length();
+                    }
+
+                    if (title != null) {
+                        System.out.println("****************" + title);
+                    }
+
+                    String srcLink = element.getSrcLink();
+                    Long createTime = element.getCreatetime();
+                    Long currentTime = new Date().getTime();
+                    System.out.println("createTime is: " + createTime);
+                    System.out.println("currentTime is: " + currentTime);
+                    if ((currentTime - createTime) > 3 * 60 * 60 * 1000L) {
+                        if (DEBUG.equals("false")) {
+                            return;
                         }
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-                System.out.println("**************** Thread ID is: " + Thread.currentThread().getId());
 
-                Map<String, Object> sourceMeta = element.getSourceMeta();
-                //System.out.println("****************" + sourceMeta);
-                Map<String, Object> extra = element.getExtra();
-                //System.out.println("****************" + extra);
-                Map<String, Object> debugInfo = null;
-
-                int sourceId = 0;
-                String crawlId = null;
-                if (extra != null) {
-                    debugInfo = (Map<String, Object>) extra.get("DEBUG_INFO");
-                    //System.out.println("****************" + debugInfo);
-                }
-                ;
-
-                if (debugInfo != null) {
-                    sourceId = (int) debugInfo.get("sourceId");
-                    //System.out.println("****************" + sourceId);
-                    crawlId = (String) debugInfo.get("CRAWL_ID");
-                    System.out.println("****************" + crawlId);
-                }
-
-                String content = element.getContent();
-                String originalContent = content;
-                String title = element.getTitle();
-
-                int titleLength = 0;
-                if (title != null) {
-                    titleLength = title.length();
-                }
-
-                if (title != null) {
-                    System.out.println("****************" + title);
-                }
-
-                String srcLink = element.getSrcLink();
-                Long createTime = element.getCreatetime();
-                Long currentTime = new Date().getTime();
-                System.out.println("createTime is: " + createTime);
-                System.out.println("currentTime is: " + currentTime);
-                if ((currentTime - createTime) > 3 * 60 * 60 * 1000L) {
-                    if (DEBUG.equals("false")) {
-                        return;
+                    /**
+                     * 解决“今日美女”问题
+                     */
+                    String displayType = null;
+                    String flag = null;
+                    int messagePriority = 0;
+                    if (sourceMeta != null) {
+                        messagePriority = (int) sourceMeta.get(FeedMessage.FEED_SOURCE_META_PRIORITY);
+                        flag = (String) sourceMeta.get(FeedMessage.FEED_SOURCE_META_MODE);
+                        MessageType messageType = (MessageType) sourceMeta.get(FeedConstants.FEED_SOURCE_META_DISPLAY_TEMPLATE);
+                        if (null != messageType) {
+                            displayType = messageType.getName();
+                            System.err.println("display type is: " + displayType);
+                        }
                     }
-                }
-
-                /**
-                 * 解决“今日美女”问题
-                 */
-                String displayType = null;
-                String flag = null;
-                int messagePriority = 0;
-                if (sourceMeta != null) {
-                    messagePriority = (int) sourceMeta.get(FeedMessage.FEED_SOURCE_META_PRIORITY);
-                    flag = (String) sourceMeta.get(FeedMessage.FEED_SOURCE_META_MODE);
-                    MessageType messageType = (MessageType) sourceMeta.get(FeedConstants.FEED_SOURCE_META_DISPLAY_TEMPLATE);
-                    if (null != messageType) {
-                        displayType = messageType.getName();
-                        System.err.println("display type is: " + displayType);
+                    if (title != null) {
+                        content = title + " " + content;
                     }
-                }
-                if (title != null) {
-                    content = title + " " + content;
-                }
 
-                content = processContent(content);
-                int contentLength = content.length();
+                    content = processContent(content);
+                    int contentLength = content.length();
 
-                List<String> sentences = getLongestSentences(content);
+                    List<String> sentences = getLongestSentences(content);
 
-                final NewsSimHash ns = new NewsSimHash(stopWords, content, false);
-                Map<String, Integer> wordsMap = ns.getWordsMap();
-                List<Term> parse = ns.getParse();
-                String id = ns.getIntSimHash().toString(16);
-                element.setId(id);
-                System.out.println("****************" + element.getId());
-                System.err.println("message priority is: " + messagePriority);
+                    final NewsSimHash ns = new NewsSimHash(stopWords, content, false);
+                    Map<String, Integer> wordsMap = ns.getWordsMap();
+                    List<Term> parse = ns.getParse();
+                    String id = ns.getIntSimHash().toString(16);
+                    element.setId(id);
+                    System.out.println("****************" + element.getId());
+                    System.err.println("message priority is: " + messagePriority);
 
-                boolean existing = false;
-                int[] index = new int[4];
-                long l = ns.getIntSimHash().longValue();
-                String strSH = ns.getIntSimHash().toString(16);
-                index[0] = (int) ((l >> 48) & (long) 0xFFFF);
-                index[1] = (int) ((l >> 32) & (long) 0xFFFF);
-                index[2] = (int) ((l >> 16) & (long) 0xFFFF);
-                index[3] = (int) (l & (long) 0xFFFF);
-                System.out.println("****************" + index[0]);
-                System.out.println("****************" + index[1]);
-                System.out.println("****************" + index[2]);
-                System.out.println("****************" + index[3]);
+                    boolean existing = false;
+                    int[] index = new int[4];
+                    long l = ns.getIntSimHash().longValue();
+                    String strSH = ns.getIntSimHash().toString(16);
+                    index[0] = (int) ((l >> 48) & (long) 0xFFFF);
+                    index[1] = (int) ((l >> 32) & (long) 0xFFFF);
+                    index[2] = (int) ((l >> 16) & (long) 0xFFFF);
+                    index[3] = (int) (l & (long) 0xFFFF);
+                    System.out.println("****************" + index[0]);
+                    System.out.println("****************" + index[1]);
+                    System.out.println("****************" + index[2]);
+                    System.out.println("****************" + index[3]);
 
-                if (index[0] == 65535) {
-                    System.err.println("**************** Content is: " + content);
-                }
+                    if (index[0] == 65535) {
+                        System.err.println("**************** Content is: " + content);
+                    }
 
-                String newsId = null;
-                String duplicateId = null;
-                try {
-                    int i = 0;
-                    for (i = 0; i <= 3; i++) {
-                        FindIterable iterable = simhash.find(new Document("index", index[i]));
-                        MongoCursor cursor = iterable.iterator();
-                        while (cursor.hasNext()) {
-                            Document document = (Document) cursor.next();
+                    String newsId = null;
+                    String duplicateId = null;
+                    try {
+                        int i = 0;
+                        for (i = 0; i <= 3; i++) {
+                            FindIterable iterable = simhash.find(new Document("index", index[i]));
+                            MongoCursor cursor = iterable.iterator();
+                            while (cursor.hasNext()) {
+                                Document document = (Document) cursor.next();
 
-                            //System.out.println(document);
-                            //System.out.println(document.toJson());
+                                //System.out.println(document);
+                                //System.out.println(document.toJson());
 
-                            String newsStr = document.toJson();
-                            //System.out.println("**************** newsStr is: " + newsStr);
-                            JSONObject newsObj = (JSONObject) JSON.parse(newsStr);
-                            JSONArray newsArr = (JSONArray) newsObj.get("news");
-                            for (int k = 0; k < newsArr.size(); k++) {
-                                JSONObject news = (JSONObject) newsArr.get(k);
-                                newsId = (String) news.get("newsId");
-                                //System.out.println(newsId);
-                                if (hammingDistance(newsId, id) <= 4) {
-                                    System.out.println("existing");
-                                    duplicateId = newsId;
-                                    existing = true;
+                                String newsStr = document.toJson();
+                                //System.out.println("**************** newsStr is: " + newsStr);
+                                JSONObject newsObj = (JSONObject) JSON.parse(newsStr);
+                                JSONArray newsArr = (JSONArray) newsObj.get("news");
+                                for (int k = 0; k < newsArr.size(); k++) {
+                                    JSONObject news = (JSONObject) newsArr.get(k);
+                                    newsId = (String) news.get("newsId");
+                                    //System.out.println(newsId);
+                                    if (hammingDistance(newsId, id) <= 4) {
+                                        System.out.println("existing");
+                                        duplicateId = newsId;
+                                        existing = true;
+                                        break;
+                                    }
+                                }
+                                if (existing) {
                                     break;
                                 }
                             }
+                            cursor.close();
                             if (existing) {
                                 break;
                             }
                         }
-                        cursor.close();
-                        if (existing) {
-                            break;
-                        }
-                    }
 
                     /*
                     String titleString = null;
@@ -874,459 +882,462 @@ public class NewsSimHash {
                             }
                             */
 
-                    if (!existing && sentences.size() > 0) {
-                                String combinedSentence = null;
-                                for (String sentence : sentences) {
-                                    combinedSentence += sentence; 
-                                }
-                                for (int dum = 0; dum < 1; dum++) {
-                                    NewsSimHash sentenceNs = new NewsSimHash(stopWords, combinedSentence, false);
-                                    long sentenceId = sentenceNs.getIntSimHash().longValue();
-                                    FindIterable iterable = sentenceCollection.find(new Document("index", sentenceId));
-                                    MongoCursor cursor = iterable.iterator();
-                                    boolean updated = false;
+                        if (!existing && sentences.size() > 0) {
+                            String combinedSentence = null;
+                            for (String sentence : sentences) {
+                                combinedSentence += sentence;
+                            }
+                            for (int dum = 0; dum < 1; dum++) {
+                                NewsSimHash sentenceNs = new NewsSimHash(stopWords, combinedSentence, false);
+                                long sentenceId = sentenceNs.getIntSimHash().longValue();
+                                FindIterable iterable = sentenceCollection.find(new Document("index", sentenceId));
+                                MongoCursor cursor = iterable.iterator();
+                                boolean updated = false;
 
-                                    while (cursor.hasNext()) {
-                                        Document document = (Document)cursor.next();
+                                while (cursor.hasNext()) {
+                                    Document document = (Document) cursor.next();
 
-                                        System.out.println(document);
-                                        System.out.println(document.toJson());
+                                    System.out.println(document);
+                                    System.out.println(document.toJson());
 
-                                        String sentenceJson = document.toJson();
-                                        JSONObject sentenceJsonObj = (JSONObject)JSON.parse(sentenceJson);
-                                        JSONArray sentenceArr = (JSONArray)sentenceJsonObj.get("sentences");
-                                        for(int k=0; k < sentenceArr.size(); k++){
-                                            JSONObject sentenceObj = (JSONObject)sentenceArr.get(k);
-                                            String sentenceStr = (String)sentenceObj.get("sentence");
-                                            //if (sentenceStr.equals(sentence)) {
-                                            if (true) {
-                                                JSONObject timeStampOldObj = (JSONObject)sentenceObj.get("timeStamp");
-                                                String timeStampOldStr = (String)timeStampOldObj.get("$numberLong");
-                                                Long timeStampOld = Long.parseLong(timeStampOldStr);
-                                                String existingId = (String)sentenceObj.get("newsId");
-                                                if (existingId.equals(id)) {
-                                                    System.out.println("&&&&&&&&&&&&&&&&& " + id);
-                                                    continue;
-                                                }
-                                                if ((timeStamp - timeStampOld) > 1728000L * 1000) {
-                                                    updated = true;
-                                                    Document docToUpdate = new Document("index", sentenceId);
-                                                    docToUpdate.put("sentences.sentence", sentenceStr);
-                                                    Document doc = new Document("sentences.$.timeStamp", timeStamp);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    doc = new Document("sentences.$.newsId", id);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    doc = new Document("sentences.$.srcLink", srcLink);
-                                                    sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
-                                                    break;
-                                                } else {
-                                                    System.out.println("sentence existing");
-                                                    duplicateId = existingId;
-                                                    existing = true;
-                                                    sentenceCollection.updateOne(new Document("index", sentenceId),
-                                                            new Document("$inc", new Document("count", 1)),
-                                                            new UpdateOptions().upsert(true));
-                                                    break;
-                                                }
+                                    String sentenceJson = document.toJson();
+                                    JSONObject sentenceJsonObj = (JSONObject) JSON.parse(sentenceJson);
+                                    JSONArray sentenceArr = (JSONArray) sentenceJsonObj.get("sentences");
+                                    for (int k = 0; k < sentenceArr.size(); k++) {
+                                        JSONObject sentenceObj = (JSONObject) sentenceArr.get(k);
+                                        String sentenceStr = (String) sentenceObj.get("sentence");
+                                        //if (sentenceStr.equals(sentence)) {
+                                        if (true) {
+                                            JSONObject timeStampOldObj = (JSONObject) sentenceObj.get("timeStamp");
+                                            String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
+                                            Long timeStampOld = Long.parseLong(timeStampOldStr);
+                                            String existingId = (String) sentenceObj.get("newsId");
+                                            if (existingId.equals(id)) {
+                                                System.out.println("&&&&&&&&&&&&&&&&& " + id);
+                                                continue;
+                                            }
+                                            if ((timeStamp - timeStampOld) > 1728000L * 1000) {
+                                                updated = true;
+                                                Document docToUpdate = new Document("index", sentenceId);
+                                                docToUpdate.put("sentences.sentence", sentenceStr);
+                                                Document doc = new Document("sentences.$.timeStamp", timeStamp);
+                                                sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
+                                                doc = new Document("sentences.$.newsId", id);
+                                                sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
+                                                doc = new Document("sentences.$.srcLink", srcLink);
+                                                sentenceCollection.updateOne(docToUpdate, new Document("$set", doc));
+                                                break;
+                                            } else {
+                                                System.out.println("sentence existing");
+                                                duplicateId = existingId;
+                                                existing = true;
+                                                sentenceCollection.updateOne(new Document("index", sentenceId),
+                                                        new Document("$inc", new Document("count", 1)),
+                                                        new UpdateOptions().upsert(true));
+                                                break;
                                             }
                                         }
-                                        if (existing) {
-                                            break;
-                                        }
-                                    }
-                                    cursor.close();
-                                    
-                                    if ((!existing) && (!updated)) {
-                                        Document doc = new Document("sentence", combinedSentence);
-                                        doc.put("timeStamp", timeStamp);
-                                        doc.put("newsId", id);
-                                        doc.put("srcLink", srcLink);
-                                        sentenceCollection.updateOne(new Document("index", sentenceId),
-                                                new Document("$push", new Document("sentences", doc)),
-                                                new UpdateOptions().upsert(true));
                                     }
                                     if (existing) {
                                         break;
                                     }
                                 }
-                    }
+                                cursor.close();
 
-                    if (flag != null && flag.equals("debug")) {
-                        //existing = false;
-                    }
-
-                    if (id.equals("ffffffffffffffff") || "IMAGE".equalsIgnoreCase(displayType)) {
-                        /**
-                         * 如果是“纯”图片新闻（例如“今日美女”这样的源）被去重，因为其文章偶尔会有特征词、或者标题被hardcode
-                         * 为“今日美女图集”等字样， 所以其（simhash）id 不会是全‘f'。对于这类源需要设置displayType 为“IMAGE”，
-                         * 且在此处计算md5 的时候，需要对其进一步处理：使用图片url替换正文中的占位符${{}}, 然后计算md5， 这样就能
-                         * 在去重的时候将图片本身的信息考虑进去，更精确一些。
-                         *
-                         **/
-
-                        if ("IMAGE".equalsIgnoreCase(displayType)) {
-                            System.err.println(crawlId + ", this message is of 'IMAGE' type, replace image placeholders with real image url and do md5 then");
-                            Map<String, Object> mediaMap = element.getMedia();
-                            Map<String, Map> imageMap = null;
-                            if (mediaMap != null && !mediaMap.isEmpty()) {
-                                imageMap = (Map<String, Map>) mediaMap.get(FeedMessage.FEED_MEDIA_IMAGES);
-                            }
-
-                            if (null != imageMap && imageMap.size() > 0) {
-                                Pattern pattern = Pattern.compile("\\$\\{\\{(\\d+)\\}\\}\\$");
-                                Matcher matcher = pattern.matcher(originalContent);
-
-                                while (matcher.find()) {
-                                    String imagePlaceHolderKey = matcher.group(1);
-
-                                    if (imageMap.containsKey(imagePlaceHolderKey)) {
-                                        originalContent = originalContent.replace("${{" + imagePlaceHolderKey + "}}$",
-                                                (String)(imageMap.get(imagePlaceHolderKey).get("src")));
-                                    }
+                                if ((!existing) && (!updated)) {
+                                    Document doc = new Document("sentence", combinedSentence);
+                                    doc.put("timeStamp", timeStamp);
+                                    doc.put("newsId", id);
+                                    doc.put("srcLink", srcLink);
+                                    sentenceCollection.updateOne(new Document("index", sentenceId),
+                                            new Document("$push", new Document("sentences", doc)),
+                                            new UpdateOptions().upsert(true));
                                 }
-                            }
-                        }
-
-
-                        String md5Id = GetMD5Code(originalContent + title);
-                        if (md5Id != null) {
-                            id = "SP-" + md5Id;
-                            System.err.println("sp:");
-                            System.err.println(id);
-
-                            strSH = id;
-                            element.setId(id);
-                            System.err.println("set new Id: " + element.getId());
-
-                            existing = false;
-                            FindIterable iterable = md5Collection.find(new Document("index", id));
-                            MongoCursor cursor = iterable.iterator();
-                            boolean updated = false;
-
-                            while (cursor.hasNext()) {
-                                Document document = (Document) cursor.next();
-
-                                System.err.println("sp:");
-                                System.err.println(document);
-                                System.err.println(document.toJson());
-
-                                String md5Json = document.toJson();
-                                JSONObject md5JsonObj = (JSONObject) JSON.parse(md5Json);
-                                {
-                                    String md5Str = (String) md5JsonObj.get("md5");
-                                    {
-                                        JSONObject timeStampOldObj = (JSONObject) md5JsonObj.get("timeStamp");
-                                        String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
-                                        Long timeStampOld = Long.parseLong(timeStampOldStr);
-                                        String existingId = id;
-                                        if ((timeStamp - timeStampOld) > 336L * 60 * 60 * 1000) {
-                                            updated = true;
-                                            Document docToUpdate = new Document("index", id);
-                                            Document doc = new Document("timeStamp", timeStamp);
-                                            doc.put("count", 0);
-                                            md5Collection.updateOne(docToUpdate, new Document("$set", doc));
-                                            existing = false;
-                                        } else {
-                                            System.out.println("sp existing");
-                                            duplicateId = id;
-                                            existing = true;
-                                            md5Collection.updateOne(new Document("index", id),
-                                                    new Document("$inc", new Document("count", 1)),
-                                                    new UpdateOptions().upsert(true));
-                                        }
-                                    }
-                                }
-                            }
-
-                            if ((!existing) && (!updated)) {
-                                Document doc = new Document("timeStamp", timeStamp);
-                                md5Collection.updateOne(new Document("index", id),
-                                        new Document("$set", doc),
-                                        new UpdateOptions().upsert(true));
-                            }
-
-                        }
-
-                    }
-
-                    int prePriority = 0;
-                    boolean overWrite = false;
-                    if (existing) {
-                        FindIterable iterable = db.getCollection("new_priority").find(new Document("index", strSH));
-                        MongoCursor cursor = iterable.iterator();
-
-                        while (cursor.hasNext()) {
-                            Document document = (Document) cursor.next();
-                            String priorityJson = document.toJson();
-                            JSONObject priorityJsonObj = (JSONObject) JSON.parse(priorityJson);
-                            prePriority = (int) priorityJsonObj.get("priority");
-
-                            if (messagePriority > prePriority) {
-                                overWrite = true;
-                                break;
-                            }
-
-                            JSONObject timeStampOldObj = (JSONObject) priorityJsonObj.get("timeStamp");
-                            if (timeStampOldObj != null) {
-                                String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
-                                Long timeStampOld = Long.parseLong(timeStampOldStr);
-                                if ((timeStamp - timeStampOld) > 180L * 24 * 60 * 60 * 1000) {
-                                    overWrite = true;
+                                if (existing) {
                                     break;
                                 }
                             }
                         }
 
-                        cursor.close();
-
-                        if (overWrite) {
-                            System.err.println("**************** overWrite! " + crawlId + " " + id + " " + duplicateId);
-                            existing = false;
-                            id = duplicateId;
-                            element.setId(id);
-                        }
-                    }
-
-                    if (!existing) {
-
-                        KeyWordComputer kwc = new KeyWordComputer(20);
-                        Collection<Keyword> result = kwc.computeArticleTfidf(parse, contentLength, titleLength);
-                        if (DEBUG.equals("true")) {
-                            System.out.println(title);
-                            System.out.println(content);
-                            System.out.println(result);
+                        if (flag != null && flag.equals("debug")) {
+                            //existing = false;
                         }
 
-                        JSONArray tagArray = new JSONArray();
-                        int count = 0;
-                        for (Keyword keyWord : result) {
-                            JSONObject tag = new JSONObject();
-                            if (count >= 1 && keyWord.getScore() < 10.0) {
-                                break;
+                        if (id.equals("ffffffffffffffff") || "IMAGE".equalsIgnoreCase(displayType)) {
+                            /**
+                             * 如果是“纯”图片新闻（例如“今日美女”这样的源）被去重，因为其文章偶尔会有特征词、或者标题被hardcode
+                             * 为“今日美女图集”等字样， 所以其（simhash）id 不会是全‘f'。对于这类源需要设置displayType 为“IMAGE”，
+                             * 且在此处计算md5 的时候，需要对其进一步处理：使用图片url替换正文中的占位符${{}}, 然后计算md5， 这样就能
+                             * 在去重的时候将图片本身的信息考虑进去，更精确一些。
+                             *
+                             **/
+
+                            if ("IMAGE".equalsIgnoreCase(displayType)) {
+                                System.err.println(crawlId + ", this message is of 'IMAGE' type, replace image placeholders with real image url and do md5 then");
+                                Map<String, Object> mediaMap = element.getMedia();
+                                Map<String, Map> imageMap = null;
+                                if (mediaMap != null && !mediaMap.isEmpty()) {
+                                    imageMap = (Map<String, Map>) mediaMap.get(FeedMessage.FEED_MEDIA_IMAGES);
+                                }
+
+                                if (null != imageMap && imageMap.size() > 0) {
+                                    Pattern pattern = Pattern.compile("\\$\\{\\{(\\d+)\\}\\}\\$");
+                                    Matcher matcher = pattern.matcher(originalContent);
+
+                                    while (matcher.find()) {
+                                        String imagePlaceHolderKey = matcher.group(1);
+
+                                        if (imageMap.containsKey(imagePlaceHolderKey)) {
+                                            originalContent = originalContent.replace("${{" + imagePlaceHolderKey + "}}$",
+                                                    (String) (imageMap.get(imagePlaceHolderKey).get("src")));
+                                        }
+                                    }
+                                }
                             }
-                            tag.put(keyWord.getName(), keyWord.getScore());
-                            tagArray.add(tag);
-                            count++;
 
-                            if (count == 10) {
-                                break;
+
+                            String md5Id = GetMD5Code(originalContent + title);
+                            if (md5Id != null) {
+                                id = "SP-" + md5Id;
+                                System.err.println("sp:");
+                                System.err.println(id);
+
+                                strSH = id;
+                                element.setId(id);
+                                System.err.println("set new Id: " + element.getId());
+
+                                existing = false;
+                                FindIterable iterable = md5Collection.find(new Document("index", id));
+                                MongoCursor cursor = iterable.iterator();
+                                boolean updated = false;
+
+                                while (cursor.hasNext()) {
+                                    Document document = (Document) cursor.next();
+
+                                    System.err.println("sp:");
+                                    System.err.println(document);
+                                    System.err.println(document.toJson());
+
+                                    String md5Json = document.toJson();
+                                    JSONObject md5JsonObj = (JSONObject) JSON.parse(md5Json);
+                                    {
+                                        String md5Str = (String) md5JsonObj.get("md5");
+                                        {
+                                            JSONObject timeStampOldObj = (JSONObject) md5JsonObj.get("timeStamp");
+                                            String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
+                                            Long timeStampOld = Long.parseLong(timeStampOldStr);
+                                            String existingId = id;
+                                            if ((timeStamp - timeStampOld) > 336L * 60 * 60 * 1000) {
+                                                updated = true;
+                                                Document docToUpdate = new Document("index", id);
+                                                Document doc = new Document("timeStamp", timeStamp);
+                                                doc.put("count", 0);
+                                                md5Collection.updateOne(docToUpdate, new Document("$set", doc));
+                                                existing = false;
+                                            } else {
+                                                System.out.println("sp existing");
+                                                duplicateId = id;
+                                                existing = true;
+                                                md5Collection.updateOne(new Document("index", id),
+                                                        new Document("$inc", new Document("count", 1)),
+                                                        new UpdateOptions().upsert(true));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if ((!existing) && (!updated)) {
+                                    Document doc = new Document("timeStamp", timeStamp);
+                                    md5Collection.updateOne(new Document("index", id),
+                                            new Document("$set", doc),
+                                            new UpdateOptions().upsert(true));
+                                }
+
+                            }
+
+                        }
+
+                        int prePriority = 0;
+                        boolean overWrite = false;
+                        if (existing) {
+                            FindIterable iterable = db.getCollection("new_priority").find(new Document("index", strSH));
+                            MongoCursor cursor = iterable.iterator();
+
+                            while (cursor.hasNext()) {
+                                Document document = (Document) cursor.next();
+                                String priorityJson = document.toJson();
+                                JSONObject priorityJsonObj = (JSONObject) JSON.parse(priorityJson);
+                                prePriority = (int) priorityJsonObj.get("priority");
+
+                                if (messagePriority > prePriority) {
+                                    overWrite = true;
+                                    break;
+                                }
+
+                                JSONObject timeStampOldObj = (JSONObject) priorityJsonObj.get("timeStamp");
+                                if (timeStampOldObj != null) {
+                                    String timeStampOldStr = (String) timeStampOldObj.get("$numberLong");
+                                    Long timeStampOld = Long.parseLong(timeStampOldStr);
+                                    if ((timeStamp - timeStampOld) > 180L * 24 * 60 * 60 * 1000) {
+                                        overWrite = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            cursor.close();
+
+                            if (overWrite) {
+                                System.err.println("**************** overWrite! " + crawlId + " " + id + " " + duplicateId);
+                                existing = false;
+                                id = duplicateId;
+                                element.setId(id);
                             }
                         }
-                        System.out.println(tagArray.toString());
-                        String tag = tagArray.toString();
-                        element.setFeedTag(tag);
-                        if (debugInfo != null) {
-                            debugInfo.put("tags", tag);
-                        }
 
-                        /**
-                         * enhancement：如果是md5生成的id，不存入simhash collection
-                         */
-                        if (!overWrite && !element.getId().startsWith("SP-") && !"ffffffffffffffff".equalsIgnoreCase(element.getId())) {
-                            for (i = 0; i <= 3; i++) {
-                                db.getCollection("simhash").updateOne(new Document("index", index[i]),
-                                        new Document("$push", new Document("news", new Document("newsId", id))),
-                                        new UpdateOptions().upsert(true));
-                                System.out.println("************+**** insert: " + index[i] + " " + id);
+                        if (!existing) {
+
+                            KeyWordComputer kwc = new KeyWordComputer(20);
+                            Collection<Keyword> result = kwc.computeArticleTfidf(parse, contentLength, titleLength);
+                            if (DEBUG.equals("true")) {
+                                System.out.println(title);
+                                System.out.println(content);
+                                System.out.println(result);
                             }
-                        }
 
-                        Document doc = new Document("priority", messagePriority);
-                        doc.put("timeStamp", timeStamp);
-                        db.getCollection("new_priority").updateOne(new Document("index", strSH),
-                                new Document("$set", doc),
-                                new UpdateOptions().upsert(true));
+                            JSONArray tagArray = new JSONArray();
+                            int count = 0;
+                            for (Keyword keyWord : result) {
+                                JSONObject tag = new JSONObject();
+                                if (count >= 1 && keyWord.getScore() < 10.0) {
+                                    break;
+                                }
+                                tag.put(keyWord.getName(), keyWord.getScore());
+                                tagArray.add(tag);
+                                count++;
 
-                        boolean everGreen = isEverGreen(content);
-                        System.out.println("everGreen is: " + everGreen);
-                        if (debugInfo != null) {
-                            debugInfo.put("everGreen", everGreen);
-                        }
-
-                        originalContent = element.getTitle() + element.getContent();
-                        List<String> sWords = getTxtKeyWords(originalContent, sensitiveWordMap);
-                        if (sWords.size() > 0) {
-                            System.err.println("sensitive word spotted!");
-
-                            for (String sWord : sWords) {
-                                System.err.println(sWord);
+                                if (count == 10) {
+                                    break;
+                                }
                             }
-                            element.getSourceMeta().put(FEED_SOURCE_META_MESSAGE_STATUS, MessageStatus.UNKNOWN);
-                        }
-
-                        List<Integer> currentCategories = new ArrayList<Integer>();
-                        int currentCid = 0;
-                        if (sourceMeta != null) {
-                            currentCategories = (List) sourceMeta.get(FeedMessage.FEED_SOURCE_META_CATEGORIES);
-                            if (currentCategories != null) {
-                                currentCid = currentCategories.get(0);
-                                System.out.println("currentCid is: " + currentCid);
+                            System.out.println(tagArray.toString());
+                            String tag = tagArray.toString();
+                            element.setFeedTag(tag);
+                            if (debugInfo != null) {
+                                debugInfo.put("tags", tag);
                             }
-                        }
 
-                        if (sourceId == 6900 || sourceId == 6500 || sourceId == 1200000 || currentCid == 95) {
+                            /**
+                             * enhancement：如果是md5生成的id，不存入simhash collection
+                             */
+                            if (!overWrite && !element.getId().startsWith("SP-") && !"ffffffffffffffff".equalsIgnoreCase(element.getId())) {
+                                for (i = 0; i <= 3; i++) {
+                                    db.getCollection("simhash").updateOne(new Document("index", index[i]),
+                                            new Document("$push", new Document("news", new Document("newsId", id))),
+                                            new UpdateOptions().upsert(true));
+                                    System.out.println("************+**** insert: " + index[i] + " " + id);
+                                }
+                            }
+
+                            Document doc = new Document("priority", messagePriority);
+                            doc.put("timeStamp", timeStamp);
+                            db.getCollection("new_priority").updateOne(new Document("index", strSH),
+                                    new Document("$set", doc),
+                                    new UpdateOptions().upsert(true));
+
+                            boolean everGreen = isEverGreen(content, heidelTime);
+                            System.out.println("everGreen is: " + everGreen + " title is: " + title);
+                            if (debugInfo != null) {
+                                debugInfo.put("everGreen", everGreen);
+                            }
+
+                            originalContent = element.getTitle() + element.getContent();
+                            List<String> sWords = getTxtKeyWords(originalContent, sensitiveWordMap);
+                            if (sWords.size() > 0) {
+                                System.err.println("sensitive word spotted!");
+
+                                for (String sWord : sWords) {
+                                    System.err.println(sWord);
+                                }
+                                element.getSourceMeta().put(FEED_SOURCE_META_MESSAGE_STATUS, MessageStatus.UNKNOWN);
+                            }
+
+                            List<Integer> currentCategories = new ArrayList<Integer>();
+                            int currentCid = 0;
                             if (sourceMeta != null) {
-                                final Set<String> trainingCids = new HashSet<String>();
-
-                                trainingCids.add("23");
-                                trainingCids.add("24");
-                                trainingCids.add("25");
-                                trainingCids.add("26");
-                                trainingCids.add("27");
-                                trainingCids.add("28");
-                                trainingCids.add("29");
-                                trainingCids.add("30");
-                                trainingCids.add("31");
-                                trainingCids.add("32");
-                                trainingCids.add("33");
-                                trainingCids.add("40");
-                                trainingCids.add("46");
-                                trainingCids.add("44");
-                                trainingCids.add("57");
-                                trainingCids.add("36");
-                                trainingCids.add("39");
-                                trainingCids.add("9999");
-
-                                String cidResult = null;
-                                Double p_cidMax = null;
-                                String oldCidResult = null;
-                                for (String _cid : trainingCids) {
-                                    //Double p_cid = Math.log(1.0 * numArticlesOfClass.get(_cid) / numArticles);
-                                    Double p_cid = -1.0;
-                                    for (String word : wordsMap.keySet()) {
-                                        if (!probs.containsKey(word)) {
-                                            continue;
-                                        }
-
-                                        Map<String, Double> probOfClass = probs.get(word);
-                                        Double p = probOfClass.get(_cid);
-                                        p_cid += Math.log(p) * wordsMap.get(word);
-                                    }
-
-                                    if (p_cidMax == null) {
-                                        p_cidMax = p_cid;
-                                        cidResult = _cid;
-                                    } else {
-                                        if (p_cid > p_cidMax) {
-                                            p_cidMax = p_cid;
-                                            oldCidResult = cidResult;
-                                            cidResult = _cid;
-                                        }
-                                    }
-                                }
-
-
-                                if (sourceId == 6900 || sourceId == 6500 || sourceId == 1200000 || currentCid == 95) {
-                                    if (currentCid == 95 && cidResult.equals("9999")) {
-                                        if (oldCidResult != null) {
-                                            cidResult = oldCidResult;
-                                        }
-                                    }
-
-                                    if (cidResult.equals("57")) {
-                                        cidResult = "99";
-                                    }
-
-                                    if (!cidResult.equals("9999")) {
-                                        List<Integer> categories = new ArrayList<Integer>();
-                                        categories.add(Integer.parseInt(cidResult));
-                                        sourceMeta.put(FeedMessage.FEED_SOURCE_META_CATEGORIES, categories);
-                                        if (currentCid == 95) {
-                                            System.out.println("cidResult is: " + cidResult);
-                                            System.out.println("newsId is: " + id);
-                                        }
-                                    }
-                                }
-
-                                if (cidResult.equals("9999")) {
-                                    //element.getSourceMeta().put(FEED_SOURCE_META_MESSAGE_STATUS, MessageStatus.UNKNOWN);
+                                currentCategories = (List) sourceMeta.get(FeedMessage.FEED_SOURCE_META_CATEGORIES);
+                                if (currentCategories != null) {
+                                    currentCid = currentCategories.get(0);
+                                    System.out.println("currentCid is: " + currentCid);
                                 }
                             }
-                        }
 
-                        // hanxw: 20160301 解决消息队列不平衡问题:对key进行hash, 确保message被散列到多个partition上被并行处理
-                        String kafkaKey = "";
-                        if (null == title) {
-                            kafkaKey = String.valueOf(System.currentTimeMillis());
+                            if (sourceId == 6900 || sourceId == 6500 || sourceId == 1200000 || currentCid == 95) {
+                                if (sourceMeta != null) {
+                                    final Set<String> trainingCids = new HashSet<String>();
+
+                                    trainingCids.add("23");
+                                    trainingCids.add("24");
+                                    trainingCids.add("25");
+                                    trainingCids.add("26");
+                                    trainingCids.add("27");
+                                    trainingCids.add("28");
+                                    trainingCids.add("29");
+                                    trainingCids.add("30");
+                                    trainingCids.add("31");
+                                    trainingCids.add("32");
+                                    trainingCids.add("33");
+                                    trainingCids.add("40");
+                                    trainingCids.add("46");
+                                    trainingCids.add("44");
+                                    trainingCids.add("57");
+                                    trainingCids.add("36");
+                                    trainingCids.add("39");
+                                    trainingCids.add("9999");
+
+                                    String cidResult = null;
+                                    Double p_cidMax = null;
+                                    String oldCidResult = null;
+                                    for (String _cid : trainingCids) {
+                                        //Double p_cid = Math.log(1.0 * numArticlesOfClass.get(_cid) / numArticles);
+                                        Double p_cid = -1.0;
+                                        for (String word : wordsMap.keySet()) {
+                                            if (!probs.containsKey(word)) {
+                                                continue;
+                                            }
+
+                                            Map<String, Double> probOfClass = probs.get(word);
+                                            Double p = probOfClass.get(_cid);
+                                            p_cid += Math.log(p) * wordsMap.get(word);
+                                        }
+
+                                        if (p_cidMax == null) {
+                                            p_cidMax = p_cid;
+                                            cidResult = _cid;
+                                        } else {
+                                            if (p_cid > p_cidMax) {
+                                                p_cidMax = p_cid;
+                                                oldCidResult = cidResult;
+                                                cidResult = _cid;
+                                            }
+                                        }
+                                    }
+
+
+                                    if (sourceId == 6900 || sourceId == 6500 || sourceId == 1200000 || currentCid == 95) {
+                                        if (currentCid == 95 && cidResult.equals("9999")) {
+                                            if (oldCidResult != null) {
+                                                cidResult = oldCidResult;
+                                            }
+                                        }
+
+                                        if (cidResult.equals("57")) {
+                                            cidResult = "99";
+                                        }
+
+                                        if (!cidResult.equals("9999")) {
+                                            List<Integer> categories = new ArrayList<Integer>();
+                                            categories.add(Integer.parseInt(cidResult));
+                                            sourceMeta.put(FeedMessage.FEED_SOURCE_META_CATEGORIES, categories);
+                                            if (currentCid == 95) {
+                                                System.out.println("cidResult is: " + cidResult);
+                                                System.out.println("newsId is: " + id);
+                                            }
+                                        }
+                                    }
+
+                                    if (cidResult.equals("9999")) {
+                                        //element.getSourceMeta().put(FEED_SOURCE_META_MESSAGE_STATUS, MessageStatus.UNKNOWN);
+                                    }
+                                }
+                            }
+
+                            // hanxw: 20160301 解决消息队列不平衡问题:对key进行hash, 确保message被散列到多个partition上被并行处理
+                            String kafkaKey = "";
+                            if (null == title) {
+                                kafkaKey = String.valueOf(System.currentTimeMillis());
+                            } else {
+                                kafkaKey = MD5Util.string2MD5(title);
+                            }
+                            queuedProducer.sendMessage("feedCategories", kafkaKey, element);
                         } else {
-                            kafkaKey = MD5Util.string2MD5(title);
-                        }
-                        queuedProducer.sendMessage("feedCategories", kafkaKey, element);
-                    } else {
-                        System.err.println("**************** Duplication spotted! " + crawlId + " " + duplicateId);
-                        System.err.println("duplicateId is: " + duplicateId);
-                        System.err.println("id is: " + id);
-                        System.err.println("title is: " + title);
-                        //Todo:
-                        //System.err.println("content is: " + content);
-                        if (!id.equals("ffffffffffffffff")) {
-                            Document doc = new Document("title", title);
-                            doc.put("srcLink", srcLink);
-                            doc.put("id", id);
-                            doc.put("sourceId", sourceId);
+                            System.err.println("**************** Duplication spotted! " + crawlId + " " + duplicateId);
+                            System.err.println("duplicateId is: " + duplicateId);
+                            System.err.println("id is: " + id);
+                            System.err.println("title is: " + title);
+                            //Todo:
+                            //System.err.println("content is: " + content);
+                            if (!id.equals("ffffffffffffffff")) {
+                                Document doc = new Document("title", title);
+                                doc.put("srcLink", srcLink);
+                                doc.put("id", id);
+                                doc.put("sourceId", sourceId);
 
-                            //System.out.println(Long.toString(new Date().getTime()));
+                                //System.out.println(Long.toString(new Date().getTime()));
                             /*
                             count.updateOne(new Document("index", duplicateId),
                                     new Document("$push", new Document("news", doc)),
                                     new UpdateOptions().upsert(true));
                             */
-                            count.updateOne(new Document("index", duplicateId),
-                                    new Document("$inc", new Document("count", 1)),
-                                    new UpdateOptions().upsert(true));
+                                count.updateOne(new Document("index", duplicateId),
+                                        new Document("$inc", new Document("count", 1)),
+                                        new UpdateOptions().upsert(true));
 
-                            count.updateOne(new Document("_id", "metrics"),
-                                    new Document("$inc", new Document("count", 1)),
-                                    new UpdateOptions().upsert(true));
+                                count.updateOne(new Document("_id", "metrics"),
+                                        new Document("$inc", new Document("count", 1)),
+                                        new UpdateOptions().upsert(true));
                             /*
                             count.updateOne(new Document("index", duplicateId),
                                     new Document("$set", new Document("timeStamp", timeStamp)));
                             */
 
-                            int pageLinkCount = 0;
-                            FindIterable iterable = count.find(new Document("index", duplicateId));
-                            MongoCursor cursor = iterable.iterator();
-                            while (cursor.hasNext()) {
-                                Document document = (Document) cursor.next();
-                                String countJson = document.toJson();
-                                JSONObject countJsonObj = (JSONObject) JSON.parse(countJson);
-                                pageLinkCount = (int) countJsonObj.get("count");
+                                int pageLinkCount = 0;
+                                FindIterable iterable = count.find(new Document("index", duplicateId));
+                                MongoCursor cursor = iterable.iterator();
+                                while (cursor.hasNext()) {
+                                    Document document = (Document) cursor.next();
+                                    String countJson = document.toJson();
+                                    JSONObject countJsonObj = (JSONObject) JSON.parse(countJson);
+                                    pageLinkCount = (int) countJsonObj.get("count");
+                                }
+                                cursor.close();
+
+
+                                FeedMessageRefer message = new FeedMessageRefer();
+                                message.setId(duplicateId);
+                                message.setPageLinkCount(pageLinkCount);
+                                message.setTs(timeStamp);
+                                if (messagePriority > prePriority) {
+                                    System.err.println("prePriority is:" + prePriority);
+                                    System.err.println("messagePriority is:" + messagePriority);
+                                    System.err.println("message hash is:" + strSH);
+                                    message.setSourcePriority(messagePriority);
+
+                                    Document document = new Document("priority", messagePriority);
+                                    document.put("timeStamp", timeStamp);
+                                    db.getCollection("new_priority").updateOne(new Document("index", strSH),
+                                            new Document("$set", document),
+                                            new UpdateOptions().upsert(true));
+                                }
+                                queuedProducer.sendMessage("pageLinkCategories", message);
+
+                                // hanxw-20160301: send duplicated message to a specific queue for async full-message storage
+                                persistDuplicatedMessages(element, crawlId, duplicateId);
+
+                                // hanxw-20160226: send to corresponding queue for comments processing if there's comment info in feedMessage
+                                processComments(element, crawlId, duplicateId);
                             }
-                            cursor.close();
-
-
-                            FeedMessageRefer message = new FeedMessageRefer();
-                            message.setId(duplicateId);
-                            message.setPageLinkCount(pageLinkCount);
-                            message.setTs(timeStamp);
-                            if (messagePriority > prePriority) {
-                                System.err.println("prePriority is:" + prePriority);
-                                System.err.println("messagePriority is:" + messagePriority);
-                                System.err.println("message hash is:" + strSH);
-                                message.setSourcePriority(messagePriority);
-
-                                Document document = new Document("priority", messagePriority);
-                                document.put("timeStamp", timeStamp);
-                                db.getCollection("new_priority").updateOne(new Document("index", strSH),
-                                        new Document("$set", document),
-                                        new UpdateOptions().upsert(true));
-                            }
-                            queuedProducer.sendMessage("pageLinkCategories", message);
-
-                            // hanxw-20160301: send duplicated message to a specific queue for async full-message storage
-                            persistDuplicatedMessages(element, crawlId, duplicateId);
-
-                            // hanxw-20160226: send to corresponding queue for comments processing if there's comment info in feedMessage
-                            processComments(element, crawlId, duplicateId);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("mongo Exception:" + e);
+                        System.out.println("mongo Exception:" + e.getMessage());
+                        e.printStackTrace();
+                        for (StackTraceElement elem : e.getStackTrace()) {
+                            System.out.println(elem);
                         }
                     }
                 } catch (Exception e) {
-                    System.out.println("mongo Exception:" + e);
-                    System.out.println("mongo Exception:" + e.getMessage());
-                    e.printStackTrace();
-                    for (StackTraceElement elem : e.getStackTrace()) {
-                        System.out.println(elem);
-                    }
+
                 }
             }
 
@@ -2245,7 +2256,7 @@ public class NewsSimHash {
         return processedContent;
     }
 
-    public static boolean isEverGreen(String content) {
+    public static boolean isEverGreen(String content, HeidelTimeStandalone heidelTime) {
         Date date = new Date();
 
         boolean everGreen = false;
@@ -2255,11 +2266,6 @@ public class NewsSimHash {
         content = content.replace("&nbsp", "");
 
         try {
-            HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
-                    DocumentType.NEWS,
-                    OutputType.TIMEML,
-                    "/home/devbox-4/Downloads/heideltime-standalone/config.props",
-                    POSTagger.TREETAGGER, true);
 
             String result = heidelTime.process(content, date);
 
@@ -2342,7 +2348,7 @@ public class NewsSimHash {
                 for(DateTime dateTime : dateTimeList) {
                     System.out.println("dateTime.getMillis() is: " + dateTime.getMillis());
                     System.out.println("System.currentTimeMillis() is: " + System.currentTimeMillis());
-                    if (Math.abs(dateTime.getMillis() - System.currentTimeMillis()) < 365L * 24 * 60 * 60 * 1000) {
+                    if (Math.abs(dateTime.getMillis() - System.currentTimeMillis()) < 50L * 24 * 60 * 60 * 1000) {
                         everGreen = false;
                         break;
                     }
