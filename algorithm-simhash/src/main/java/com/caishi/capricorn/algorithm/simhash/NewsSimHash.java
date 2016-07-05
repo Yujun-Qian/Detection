@@ -140,6 +140,7 @@ public class NewsSimHash {
     private static String graphite_prefix = "carbon.simhash.prod";
 
     static private Pattern origin2Pattern = Pattern.compile("\\s+(-)\\s+|\\s+(\\.)\\s+|\\s+(·)\\s+|\\s+(\\d+)\\s+||\\s+(\\d+:\\d+)\\s+||\\s+(\\d+-\\d+)\\s+");
+    static private Pattern origin3Pattern = Pattern.compile("\\s*(\\d+)\\s+");
 
     /**
      * @param content    newsContent
@@ -635,7 +636,7 @@ public class NewsSimHash {
         addSensitiveWordToHashMap(sensitiveWords, sensitiveWordMap);
 
         final HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
-                DocumentType.NEWS,
+                DocumentType.NARRATIVES,
                 OutputType.TIMEML,
                 "/home/hadoop/software/config.props",
                 POSTagger.TREETAGGER, true);
@@ -2231,6 +2232,22 @@ public class NewsSimHash {
         return sb.toString();
     }
 
+    public static String filterSpecialOrigin6(String str) {
+        Matcher matcher = origin3Pattern.matcher(str);
+        StringBuffer sb = new StringBuffer();
+        boolean result1 = matcher.find();
+        while (result1) {
+            String replacement = "";
+            if (matcher.group(1) != null) {
+                replacement = matcher.group(1);
+            }
+            matcher.appendReplacement(sb, replacement);
+            result1 = matcher.find();
+        }
+        matcher.appendTail(sb);
+        return sb.toString();
+    }
+
 
     public static String filterSpecialOrigin3(String str) {
         Pattern pattern = Pattern.compile("\\s+([a-zA-Z]+)\\s+");
@@ -2264,6 +2281,7 @@ public class NewsSimHash {
 
         System.out.println("length is: " + content.length());
         content = content.replace("&nbsp", "");
+        content = filterSpecialOrigin6(content);
 
         try {
 
@@ -2292,6 +2310,11 @@ public class NewsSimHash {
 
             List<DateTime> dateTimeList = new ArrayList<DateTime>();
 
+            DateTime now = new DateTime();
+            int defaultYear = now.getYear();
+            int defaultMonth = now.getMonthOfYear();
+            int defaultDay = now.getDayOfMonth();
+
             for (int i = 0; i < nodeList.getLength(); i++)
             {
                 NamedNodeMap nnm = nodeList.item(i).getAttributes();
@@ -2301,28 +2324,47 @@ public class NewsSimHash {
                     if (nnm.item(j).getNodeName().equals("value")) {
                         System.out.print("value");
                         System.out.print("=");
-
+                        
                         System.out.println(nnm.item(j).getNodeValue());
+                        if (nnm.item(j).getNodeValue().equals("XXXX-XX-XX")) {
+                            continue;
+                        }
                         String[] timeValue = nnm.item(j).getNodeValue().split("-", 3);
 
+
                         try {
-                            year = Integer.parseInt(timeValue[0]);
+                            if (timeValue[0].equals("XXXX")) {
+                                year = defaultYear;
+                            } else {
+                                year = Integer.parseInt(timeValue[0]);
+                                defaultYear = year;
+                            }
+
                             if (timeValue.length > 1) {
-                                monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                                if (timeValue[1].equals("XX")) {
+                                    monthOfYear = defaultMonth;
+                                } else {
+                                    monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                                    defaultMonth = monthOfYear;
+                                }
                             } else {
                                 monthOfYear = 1;
                             }
 
                             if (timeValue.length > 2) {
-                                System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
-                                dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                                if (timeValue[2].equals("XX")) {
+                                    dayOfMonth = defaultDay;
+                                } else {
+                                    System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
+                                    dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                                    defaultDay = dayOfMonth;
+                                }
                             } else {
                                 dayOfMonth = 1;
                             }
 
                             DateTime dateTime = new DateTime(year, monthOfYear, dayOfMonth, 0, 0);
                             dateTimeList.add(dateTime);
-
                         } catch (Exception e) {
                             System.out.println(e.getMessage());
                             year = -1;

@@ -335,7 +335,7 @@ public class SimHashTest {
 
         //String newsId1 = "200006bb5265763c";
         //String newsId1 = "20000251c76d7554";
-          String newsId1 = "a2ddeea9214ca0eb";
+          String newsId1 = "b9fa76f0b6ecdf1a";
         //String newsId1 = "ee7f2314d041ad14";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
@@ -466,7 +466,7 @@ public class SimHashTest {
         final MongoCollection newsContent = newsDB.getCollection("newsContent");
 
 
-        String newsId1 = "13a0e5f0beafee05";
+        String newsId1 = "5f0650c8cbc73ee0";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
         while (cursor.hasNext()) {
@@ -491,11 +491,12 @@ public class SimHashTest {
 
         text = text.replace("&nbsp", "");
         text = NewsSimHash.processContent(text);
+        text = NewsSimHash.filterSpecialOrigin6(text);
 
         try {
 
             HeidelTimeStandalone heidelTime = new HeidelTimeStandalone(Language.CHINESE,
-                    DocumentType.NEWS,
+                    DocumentType.NARRATIVES,
                     OutputType.TIMEML,
                     "/home/hadoop/software/config.props",
                     POSTagger.TREETAGGER, true);
@@ -525,6 +526,11 @@ public class SimHashTest {
 
             List<DateTime> dateTimeList = new ArrayList<DateTime>();
 
+            DateTime now = new DateTime();
+            int defaultYear = now.getYear();
+            int defaultMonth = now.getMonthOfYear();
+            int defaultDay = now.getDayOfMonth();
+
             for (int i = 0; i < nodeList.getLength(); i++)
             {
                 NamedNodeMap nnm = nodeList.item(i).getAttributes();
@@ -536,19 +542,38 @@ public class SimHashTest {
                         System.out.print("=");
 
                         System.out.println(nnm.item(j).getNodeValue());
+                        if (nnm.item(j).getNodeValue().equals("XXXX-XX-XX")) {
+                            continue;
+                        }
                         String[] timeValue = nnm.item(j).getNodeValue().split("-", 3);
 
                         try {
-                            year = Integer.parseInt(timeValue[0]);
+                            if (timeValue[0].equals("XXXX")) {
+                                year = defaultYear;
+                            } else {
+                                year = Integer.parseInt(timeValue[0]);
+                                defaultYear = year;
+                            }
+
                             if (timeValue.length > 1) {
-                                monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                                if (timeValue[1].equals("XX")) {
+                                    monthOfYear = defaultMonth;
+                                } else {
+                                    monthOfYear = Integer.parseInt(timeValue[1].replaceAll("[^0-9].*", ""));
+                                    defaultMonth = monthOfYear;
+                                }
                             } else {
                                 monthOfYear = 1;
                             }
 
                             if (timeValue.length > 2) {
-                                System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
-                                dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                                if (timeValue[2].equals("XX")) {
+                                    dayOfMonth = defaultDay;
+                                } else {
+                                    System.out.println("day of month is: " + timeValue[2].replaceAll("[^0-9].*", ""));
+                                    dayOfMonth = Integer.parseInt(timeValue[2].replaceAll("[^0-9].*", ""));
+                                    defaultDay = dayOfMonth;
+                                }
                             } else {
                                 dayOfMonth = 1;
                             }
