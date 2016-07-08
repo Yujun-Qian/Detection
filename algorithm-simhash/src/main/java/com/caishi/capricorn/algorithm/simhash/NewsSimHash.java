@@ -2281,6 +2281,9 @@ public class NewsSimHash {
 
         System.out.println("length is: " + content.length());
         content = content.replace("&nbsp", "");
+        content = content.replaceAll("时", "   ");
+        content = content.replaceAll("[0-9]+   ", "");
+
         content = filterSpecialOrigin6(content);
 
         try {

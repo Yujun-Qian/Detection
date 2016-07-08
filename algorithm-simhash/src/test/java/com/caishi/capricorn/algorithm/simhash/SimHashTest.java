@@ -466,7 +466,7 @@ public class SimHashTest {
         final MongoCollection newsContent = newsDB.getCollection("newsContent");
 
 
-        String newsId1 = "5f0650c8cbc73ee0";
+        String newsId1 = "f1d106cfa31fdadb";
         FindIterable iterable = newsContent.find(new Document("_id", newsId1));
         MongoCursor cursor = iterable.iterator();
         while (cursor.hasNext()) {
@@ -490,6 +490,26 @@ public class SimHashTest {
         System.out.println("length is: " + text.length());
 
         text = text.replace("&nbsp", "");
+        text = text.replaceAll("时", "   ");
+        text = text.replaceAll("[0-9]+   ", "");
+
+        /*
+        Pattern pattern = Pattern.compile("(\\u65F6)", Pattern.UNICODE_CHARACTER_CLASS);
+        Matcher matcher = pattern.matcher(text);
+        StringBuffer sb = new StringBuffer();
+        boolean result1 = matcher.find();
+        while (result1) {
+            String replacement = "";
+            if (matcher.group(1) != null) {
+                replacement = matcher.group(1);
+            }
+            matcher.appendReplacement(sb, replacement);
+            result1 = matcher.find();
+        }
+        matcher.appendTail(sb);
+        text = sb.toString();
+        */
+
         text = NewsSimHash.processContent(text);
         text = NewsSimHash.filterSpecialOrigin6(text);
 
@@ -792,6 +812,111 @@ public class SimHashTest {
             {
                 System.out.println(title);
                 System.out.println(content);
+                System.out.println(result);
+            }
+        }
+        cursor.close();
+
+        newsId1 = "";
+        //String newsId1 = "e6dbe2822a4c5432";
+        iterable = newsContent.find(new Document("_id", newsId1));
+        cursor = iterable.iterator();
+        while (cursor.hasNext()) {
+            Document document = (Document)cursor.next();
+
+            //System.out.println(document);
+            //System.out.println(document.toJson());
+
+            String newsStr = document.toJson();
+            //System.out.println("**************** newsStr is: " + newsStr);
+            JSONObject newsObj = (JSONObject)JSON.parse(newsStr);
+            String title = (String)newsObj.get("title");
+            String original_content = (String)newsObj.get("content");
+            String content = NewsSimHash.processContent(title + original_content);
+
+            final NewsSimHash ns = new NewsSimHash(stopWords, content, false);
+            Map<String, Integer> wordsMap = ns.getWordsMap();
+            List<Term> parse = ns.getParse();
+
+            KeyWordComputer kwc = new KeyWordComputer(20);
+            Collection<Keyword> result = kwc.computeArticleTfidf(parse, content.length(), title.length());
+            {
+                System.out.println(title);
+                System.out.println(content);
+                System.out.println(result);
+            }
+        }
+        cursor.close();
+    }
+
+    @Test
+    public void testTextRank() {
+        final Set<String> stopWords = initStopWordsSet();
+        Set<String> sensitiveWords = new HashSet<String>();
+
+        String Queue_IPAddress1 = null;
+        String Queue_IPAddress2 = null;
+        String Queue_IPAddress3 = null;
+        String Kafka_IPAddress1 = null;
+        String Kafka_IPAddress2 = null;
+        String Kafka_IPAddress3 = null;
+        String SimhashDB_IPAddress = null;
+        String NewsDB_IPAddress = null;
+        String DEBUG = "false";
+        int NewsDB_Port = 0;
+
+        try {
+            InputStream is = NewsSimHash.class.getClassLoader().getResourceAsStream("config.properties");
+            if (is != null) {
+                Properties prop = new Properties();
+                prop.load(is);
+                SimhashDB_IPAddress = "";
+                NewsDB_IPAddress = "10.3.1.9";
+                NewsDB_Port = 30000;
+                System.out.println("test production");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        metaData result1 = null;
+        metaData result2 = null;
+
+        MongoClient mongoClient = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)),
+                Arrays.asList(MongoCredential.createCredential("news", "news", "news9icaishi".toCharArray())));
+        final MongoDatabase newsDB = mongoClient.getDatabase("news");
+        final MongoCollection newsContent = newsDB.getCollection("newsContent");
+
+        /*
+        MongoClient mongoClient1 = new MongoClient(Arrays.asList(new ServerAddress(NewsDB_IPAddress, NewsDB_Port)));
+        final MongoDatabase db1 = mongoClient1.getDatabase("news");
+        MongoCollection newsContent = db1.getCollection("newsContent");
+        */
+
+        String newsId1 = "6ecad2032e506705";
+        //String newsId1 = "e6dbe2822a4c5432";
+        FindIterable iterable = newsContent.find(new Document("_id", newsId1));
+        MongoCursor cursor = iterable.iterator();
+        while (cursor.hasNext()) {
+            Document document = (Document)cursor.next();
+
+            //System.out.println(document);
+            //System.out.println(document.toJson());
+
+            String newsStr = document.toJson();
+            //System.out.println("**************** newsStr is: " + newsStr);
+            JSONObject newsObj = (JSONObject)JSON.parse(newsStr);
+            String title = (String)newsObj.get("title");
+            String original_content = (String)newsObj.get("content");
+            String content = NewsSimHash.processContent(title + original_content);
+
+            final NewsSimHash ns = new NewsSimHash(stopWords, content, false);
+            Map<String, Integer> wordsMap = ns.getWordsMap();
+            List<Term> parse = ns.getParse();
+
+            Map<String, Float> result = TextRankKeyword.getKeywordList(parse, 20);
+            {
+                System.out.println("new keyword");
                 System.out.println(result);
             }
         }
